@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# 设置管理地址
+uci set network.lan.ipaddr='10.10.10.1'
+uci set network.lan.netmask='255.255.255.0'
+uci commit network
+
+# 设置 DHCP
+uci set dhcp.lan.start='100'
+uci set dhcp.lan.limit='150'
+uci set dhcp.lan.leasetime='12h'
+uci commit dhcp
+
+# 设置时区
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci commit system
+
+# 设置主题
+uci set luci.main.mediaurlbase='/luci-static/aurora'
+uci commit luci
+
+# 优化 DNS
+uci set dhcp.@dnsmasq[0].resolvfile='/tmp/resolv.conf.d/resolv.conf.auto'
+uci set dhcp.@dnsmasq[0].noresolv='0'
+uci commit dhcp
+
+# 安全设置
+sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
+sed -i 's/#ClientAliveInterval 0/ClientAliveInterval 300/g' /etc/ssh/sshd_config
+
+exit 0

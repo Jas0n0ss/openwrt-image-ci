@@ -1,0 +1,15 @@
+#!/bin/sh
+# 开机自启脚本
+
+# 优化网络参数
+echo "net.core.rmem_default=262144" >> /etc/sysctl.conf
+echo "net.core.wmem_default=262144" >> /etc/sysctl.conf
+echo "net.core.rmem_max=16777216" >> /etc/sysctl.conf
+echo "net.core.wmem_max=16777216" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+
+# 清理临时文件
+rm -rf /tmp/luci-indexcache
+
+exit 0
