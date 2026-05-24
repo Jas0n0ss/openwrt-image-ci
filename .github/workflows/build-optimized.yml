@@ -17,7 +17,7 @@ on:
 
 env:
   # Docker 配置
-  BUILDER_IMAGE: ghcr.io/${{ github.repository_owner }}/openwrt-builder:latest
+  BUILDER_IMAGE: ghcr.io/jas0n0ss/openwrt-builder:latest
   
   # CCache 配置
   CCACHE_DIR: /home/runner/.ccache
@@ -57,7 +57,7 @@ jobs:
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
-        username: ${{ github.repository_owner }}
+        username: jas0n0ss
         password: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Cache OpenWrt downloads
