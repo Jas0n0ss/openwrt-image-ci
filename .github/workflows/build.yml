@@ -111,12 +111,20 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
     
-    - name: Add plugins
+    - name: Add plugins (Corrected Passwall Integration)
       run: |
         cd lede
-        # 克隆插件
-        git clone --depth 1 https://github.com/xiaorouji/openwrt-passwall.git package/passwall
-        git clone --depth 1 https://github.com/xiaorouji/openwrt-passwall-packages.git package/passwall-packages
+        
+        # ===== 1. 按照 Passwall 官方推荐的方法一添加源 =====
+        # 在 feeds.conf.default 文件顶部插入两行核心源
+        # 注意：官方源地址就是 https://github.com/Openwrt-Passwall/openwrt-passwall.git
+        echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' > feeds.conf.default.new
+        echo 'src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' >> feeds.conf.default.new
+        # 保留原有的 feeds 配置
+        cat feeds.conf.default >> feeds.conf.default.new
+        mv feeds.conf.default.new feeds.conf.default
+        
+        # ===== 2. 添加其他自定义插件 (非 Passwall 官方源的) =====
         git clone --depth 1 https://github.com/sbwml/luci-app-mosdns.git package/mosdns
         git clone --depth 1 https://github.com/chenmozhijin/luci-app-turboacc.git package/turboacc
         git clone --depth 1 https://github.com/rufengsuixing/luci-app-adbyby-plus.git package/adbyby
@@ -128,8 +136,30 @@ jobs:
         git clone --depth 1 https://github.com/immortalwrt/luci-app-watchcat.git package/watchcat
         git clone --depth 1 https://github.com/thinktip/luci-theme-aurora.git package/aurora
         
-        # 重新安装所有feeds
+        # ===== 3. 更新并安装所有 feeds (关键步骤) =====
+        # 这会自动处理 Passwall 及其所有复杂依赖，避免手动克隆错误
+        ./scripts/feeds update -a
         ./scripts/feeds install -a
+    
+    # - name: Add plugins
+    #   run: |
+    #     cd lede
+    #     # 克隆插件
+    #     git clone --depth 1 https://github.com/xiaorouji/openwrt-passwall.git package/passwall
+    #     git clone --depth 1 https://github.com/xiaorouji/openwrt-passwall-packages.git package/passwall-packages
+    #     git clone --depth 1 https://github.com/sbwml/luci-app-mosdns.git package/mosdns
+    #     git clone --depth 1 https://github.com/chenmozhijin/luci-app-turboacc.git package/turboacc
+    #     git clone --depth 1 https://github.com/rufengsuixing/luci-app-adbyby-plus.git package/adbyby
+    #     git clone --depth 1 https://github.com/zzsj0928/luci-app-ap-modem.git package/modem
+    #     git clone --depth 1 https://github.com/immortalwrt/luci-app-arpbind.git package/arpbind
+    #     git clone --depth 1 https://github.com/kenzok78/luci-app-broadbandacc.git package/bandacc
+    #     git clone --depth 1 https://github.com/tsl0922/ttyd.git package/ttyd
+    #     git clone --depth 1 https://github.com/ximiTech/luci-app-vlmcsd.git package/vlmcsd
+    #     git clone --depth 1 https://github.com/immortalwrt/luci-app-watchcat.git package/watchcat
+    #     git clone --depth 1 https://github.com/thinktip/luci-theme-aurora.git package/aurora
+        
+    #     # 重新安装所有feeds
+    #     ./scripts/feeds install -a
     
     - name: Customize
       run: |
