@@ -32,6 +32,5 @@ jobs:
           push: true
           tags: |
             ghcr.io/jas0n0ss/openwrt-builder:latest
-            ghcr.io/jas0n0ss/openwrt-builder:${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
