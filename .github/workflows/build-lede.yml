@@ -30,8 +30,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: ${{ fromJSON(github.event.inputs.device == 'all' && '["r2s","cr660x","x86"]' || format('["{0}"]', github.event.inputs.device)) }}
+        device: [r2s, cr660x, x86]
     name: Build LEDE for ${{ matrix.device }}
+    # 如果手动选择了特定设备，只编译那个设备
+    if: github.event.inputs.device == 'all' || github.event.inputs.device == matrix.device
 
     steps:
       - name: Checkout builder config
