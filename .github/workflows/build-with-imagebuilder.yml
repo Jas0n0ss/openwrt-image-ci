@@ -63,30 +63,19 @@ jobs:
     strategy:
       matrix:
         include:
-          - { 
-              device: "x86_64", 
-              target: "x86/64", 
-              profile: "generic",
-              # LEDE 的 ImageBuilder 下载地址（从 LEDE 源码构建）
-              ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64"
-            }
-          - { 
-              device: "rockchip-armv8", 
-              target: "rockchip/armv8", 
-              profile: "friendlyarm_nanopi-r2s",
-              ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/rockchip/armv8"
-            }
-          - { 
-              device: "ramips-mt7621", 
-              target: "ramips/mt7621", 
-              profile: "xiaomi_mi-router-cr660x",
-              ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/ramips/mt7621"
-            }
+          - { device: "x86_64", target: "x86/64", profile: "generic", ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64" }
+          - { device: "rockchip-armv8", target: "rockchip/armv8", profile: "friendlyarm_nanopi-r2s", ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/rockchip/armv8" }
+          - { device: "ramips-mt7621", target: "ramips/mt7621", profile: "xiaomi_mi-router-cr660x", ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/ramips/mt7621" }
     runs-on: ubuntu-22.04
     name: Build LEDE ${{ needs.get-lede-version.outputs.version }} for ${{ matrix.device }}
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' && matrix.device == 'x86_64'
 
     steps:
+      - name: Skip non-x86_64 on push events
+        if: github.event_name == 'push' && matrix.device != 'x86_64'
+        run: |
+          echo "Push event triggered: skipping ${{ matrix.device }} because only x86_64 is built on push"
+          exit 0
+      
       - name: Checkout custom files
         uses: actions/checkout@v4
 
