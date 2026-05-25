@@ -3,6 +3,7 @@ env:
   MAKEFLAGS: -j$(nproc)           # 使用所有 CPU 核心
   FORCE_UNSAFE_CONFIGURE: 1       # 允许 root 编译
   CCACHE_DIR: /home/runner/.ccache
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   workflow_dispatch:
@@ -143,6 +144,12 @@ jobs:
       run: |
         cd lede
         
+        rm -rf feeds/packages/net/vlmcsd
+        rm -rf package/feeds/packages/vlmcsd
+        
+        echo "# CONFIG_PACKAGE_vlmcsd is not set" >> .config
+        echo "# CONFIG_PACKAGE_luci-app-vlmcsd is not set" >> .config
+
         # 修改默认IP
         sed -i 's/192.168.1.1/10.10.10.1/g' package/base-files/files/bin/config_generate
         
