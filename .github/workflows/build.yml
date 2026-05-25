@@ -6,7 +6,7 @@ on:
       device:
         description: '设备'
         required: true
-        default: 'all'
+        default: 'cr660x'
         type: choice
         options: ['all', 'r2s', 'cr660x', 'x86']
   schedule:
