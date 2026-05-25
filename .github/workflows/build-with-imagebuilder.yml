@@ -151,21 +151,36 @@ jobs:
         run: |
           cd lede
           
-          make package/feeds/passwall_luci/luci-app-passwall/compile -j$(nproc)
-          make package/mosdns/compile -j$(nproc)
-          make package/turboacc/compile -j$(nproc)
-          make package/ttyd/compile -j$(nproc)
-          make package/aurora/compile -j$(nproc)
+          # 首先编译 toolchain 和基础依赖
+          echo "=== 编译 toolchain ==="
+          make toolchain/compile -j$(nproc)
           
+          echo "=== 编译基础库 ==="
+          make package/libs/toolchain/compile -j$(nproc)
+          make package/utils/lua/compile -j$(nproc)
+          
+          # 编译 luci 基础
+          echo "=== 编译 Luci 基础 ==="
+          make feeds/luci/luci-base/compile -j$(nproc)
+          
+          # 更新所有包的依赖关系
+          make package/symlinks
+          
+          # 单独编译需要的包
+          echo "=== 编译 PassWall ==="
+          make package/feeds/passwall_luci/luci-app-passwall/compile -j$(nproc) || make package/feeds/passwall_luci/luci-app-passwall/compile -j1 V=s
+          
+          echo "=== 编译其他插件 ==="
+          make package/mosdns/compile -j$(nproc) || make package/mosdns/compile -j1
+          make package/turboacc/compile -j$(nproc) || make package/turboacc/compile -j1
+          make package/ttyd/compile -j$(nproc) || make package/ttyd/compile -j1
+          make package/aurora/compile -j$(nproc) || make package/aurora/compile -j1
+          
+          # 收集 ipk 文件
           mkdir -p ../packages/${{ matrix.device }}
-          find bin/packages/ -name "*.ipk" -exec cp {} ../packages/${{ matrix.device }} \/
-      
-      - name: Upload packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: custom-packages-${{ matrix.device }}
-          path: packages/${{ matrix.device }}
-          retention-days: 7
+          find bin/packages/ -name "*.ipk" -exec cp {} ../packages/${{ matrix.device }} \;
+          echo "=== 生成的 ipk 包 ==="
+          ls -la ../packages/${{ matrix.device }}/
 
   # ===== 第三步：使用 ImageBuilder 打包固件 =====
   build-firmware:
