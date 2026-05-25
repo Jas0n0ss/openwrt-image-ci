@@ -11,8 +11,8 @@ on:
         options: ['all', 'r2s', 'cr660x', 'x86']
   schedule:
     - cron: 0 20 * * *
-  push:
-    branches: [ "main" ]
+  # push:
+  #   branches: [ "main" ]
 
 permissions:
   contents: write
