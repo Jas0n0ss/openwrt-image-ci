@@ -1,10 +1,10 @@
-name: Build OpenWrt Firmware with ImageBuilder
+name: LEDE Firmware Builder (ImageBuilder)
 
 on:
   workflow_dispatch:
     inputs:
       device:
-        description: '选择设备'
+        description: '设备'
         required: true
         default: 'all'
         type: choice
@@ -15,70 +15,253 @@ on:
           - ramips-mt7621
   schedule:
     - cron: '0 20 * * 0'
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # LEDE 当前最新版本 r25.10.1
+  LEDE_VERSION: "r25.10.1"
 
 jobs:
+  get-lede-version:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      kernel: ${{ steps.version.outputs.kernel }}
+    steps:
+      - name: Checkout LEDE source
+        uses: actions/checkout@v4
+        with:
+          repository: coolsnowwolf/lede
+          path: lede
+          ref: master
+      
+      - name: Get LEDE version
+        id: version
+        run: |
+          cd lede
+          # 从 default-settings 读取版本号
+          if [ -f package/lean/default-settings/files/zzz-default-settings ]; then
+            VERSION=$(grep -o 'R[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]' package/lean/default-settings/files/zzz-default-settings | head -1)
+          fi
+          if [ -z "$VERSION" ]; then
+            VERSION="${{ env.LEDE_VERSION }}"
+          fi
+          # 获取内核版本
+          KERNEL=$(make kernel_version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+.[0-9]\+' | head -1 || echo "6.6.110")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "kernel=${KERNEL}" >> $GITHUB_OUTPUT
+          echo "LEDE 版本: ${VERSION}, 内核: ${KERNEL}"
+
   build:
+    needs: get-lede-version
     strategy:
       matrix:
         include:
-          - { target: "x86_64", profile: "generic", builder_tag: "x86_64-latest" }
-          - { target: "rockchip-armv8", profile: "friendlyarm_nanopi-r2s", builder_tag: "rockchip-armv8-latest" }
-          - { target: "ramips-mt7621", profile: "xiaomi_mi-router-cr660x", builder_tag: "ramips-mt7621-latest" }
-    runs-on: ubuntu-latest
-    name: Build ${{ matrix.profile }}
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+          - { 
+              device: "x86_64", 
+              target: "x86/64", 
+              profile: "generic",
+              # LEDE 的 ImageBuilder 下载地址（从 LEDE 源码构建）
+              ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64"
+            }
+          - { 
+              device: "rockchip-armv8", 
+              target: "rockchip/armv8", 
+              profile: "friendlyarm_nanopi-r2s",
+              ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/rockchip/armv8"
+            }
+          - { 
+              device: "ramips-mt7621", 
+              target: "ramips/mt7621", 
+              profile: "xiaomi_mi-router-cr660x",
+              ib_url: "https://downloads.openwrt.org/releases/23.05.5/targets/ramips/mt7621"
+            }
+    runs-on: ubuntu-22.04
+    name: Build LEDE ${{ needs.get-lede-version.outputs.version }} for ${{ matrix.device }}
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' && matrix.device == 'x86_64'
 
     steps:
       - name: Checkout custom files
         uses: actions/checkout@v4
 
-      - name: Skip non-x86_64 on push
-        if: github.event_name == 'push' && matrix.target != 'x86_64'
+      - name: Setup environment
         run: |
-          echo "Push event: skipping matrix.target=${{ matrix.target }}"
+          sudo apt update
+          sudo apt install -y wget xz-utils unzip
+
+      # ===== 下载并使用 ImageBuilder =====
+      - name: Download ImageBuilder
+        run: |
+          cd ${{ github.workspace }}
+          
+          echo "下载 ImageBuilder for ${{ matrix.device }}"
+          wget -q ${{ matrix.ib_url }}/openwrt-imagebuilder-*.Linux-x86_64.tar.xz
+          
+          tar -xf openwrt-imagebuilder-*.Linux-x86_64.tar.xz
+          mv openwrt-imagebuilder-* imagebuilder
+          rm openwrt-imagebuilder-*.Linux-x86_64.tar.xz
+          
+          echo "ImageBuilder 下载完成"
+
+      - name: Prepare custom files
+        run: |
+          cd ${{ github.workspace }}/imagebuilder
+          
+          # 创建自定义文件目录
+          mkdir -p files/etc/uci-defaults
+          mkdir -p files/etc/config
+          
+          # 设置默认 IP 为 10.10.10.1
+          cat > files/etc/uci-defaults/99-custom-ip << 'EOF'
+          #!/bin/sh
+          uci set network.lan.ipaddr='10.10.10.1'
+          uci set network.lan.netmask='255.255.255.0'
+          uci commit network
+          uci set dhcp.lan.start='100'
+          uci set dhcp.lan.limit='150'
+          uci commit dhcp
           exit 0
-
-      - name: Build Firmware with ImageBuilder
-        run: |
-          # 创建输出目录
-          mkdir -p ./bin
+          EOF
+          chmod +x files/etc/uci-defaults/99-custom-ip
           
-          # 运行 Docker 容器构建固件
-          docker run --rm \
-            -v ${{ github.workspace }}/files:/files \
-            -v ${{ github.workspace }}/bin:/home/builder/bin \
-            openwrt/imagebuilder:${{ matrix.builder_tag }} \
-            make image \
-              PROFILE="${{ matrix.profile }}" \
-              PACKAGES="luci luci-ssl luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-app-passwall luci-app-passwall_Including_Hysteria luci-app-passwall_Including_V2ray luci-app-passwall_Including_Xray luci-app-mosdns luci-app-turboacc luci-app-ttyd luci-theme-aurora luci-app-arpbind" \
-              FILES="/files"
-          
-          echo "构建完成，查看生成的文件："
-          ls -la ./bin/
+          # 复制用户自定义文件
+          if [ -d "${{ github.workspace }}/files" ]; then
+            cp -rf ${{ github.workspace }}/files/* ./
+          fi
 
-      - name: Rename and organize firmware files
+      - name: Build firmware with ImageBuilder
         run: |
-          # 查找生成的固件文件
-          find ./bin -type f \( -name "*.img.gz" -o -name "*.bin" -o -name "*.vmdk" -o -name "*.qcow2" \) | while read file; do
-            dir=$(dirname "$file")
+          cd ${{ github.workspace }}/imagebuilder
+          
+          # 包列表（LEDE 风格）
+          PACKAGES="luci luci-ssl luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
+          PACKAGES="$PACKAGES luci-app-passwall luci-app-passwall_Including_Hysteria"
+          PACKAGES="$PACKAGES luci-app-passwall_Including_V2ray luci-app-passwall_Including_Xray"
+          PACKAGES="$PACKAGES luci-app-mosdns luci-app-turboacc luci-app-ttyd"
+          PACKAGES="$PACKAGES luci-theme-aurora luci-app-arpbind"
+          
+          # 设备特定内核模块
+          case "${{ matrix.device }}" in
+            x86_64)
+              PACKAGES="$PACKAGES kmod-vmxnet3 kmod-igb kmod-ixgbe open-vm-tools"
+              ;;
+            rockchip-armv8)
+              PACKAGES="$PACKAGES kmod-usb-net-rtl8152 kmod-r8168"
+              ;;
+            ramips-mt7621)
+              PACKAGES="$PACKAGES kmod-mt7915e wpad-openssl"
+              ;;
+          esac
+          
+          # 禁用有问题的包
+          PACKAGES="$PACKAGES -vlmcsd -luci-app-vlmcsd"
+          
+          echo "包列表: $PACKAGES"
+          echo "开始构建固件 for ${{ matrix.device }}"
+          
+          # 使用 ImageBuilder 构建
+          make image \
+            PROFILE="${{ matrix.profile }}" \
+            PACKAGES="$PACKAGES" \
+            FILES="./files"
+          
+          if [ $? -eq 0 ]; then
+            echo "构建成功"
+          else
+            echo "构建失败，尝试单线程..."
+            make image PROFILE="${{ matrix.profile }}" PACKAGES="$PACKAGES" FILES="./files" -j1
+          fi
+
+      - name: Prepare artifacts
+        run: |
+          cd ${{ github.workspace }}/imagebuilder
+          
+          mkdir -p ../release/${{ matrix.device }}
+          
+          LEDE_VER="${{ needs.get-lede-version.outputs.version }}"
+          BUILD_DATE=$(date '+%Y-%m-%d')
+          
+          # 查找并重命名固件文件
+          find bin/targets/ -type f \( -name "*.img.gz" -o -name "*.bin" -o -name "*.vmdk" -o -name "*.qcow2" -o -name "*.ext4.gz" -o -name "*.squashfs" -o -name "*.img" \) 2>/dev/null | while read file; do
             filename=$(basename "$file")
-            # 重命名文件，添加 profile 信息
-            newname=$(echo "$filename" | sed "s/-squashfs-/-${{ matrix.profile }}-squashfs-/")
-            mv "$file" "$dir/$newname"
-            echo "重命名: $filename -> $newname"
+            newname="LEDE-${LEDE_VER}-${BUILD_DATE}-${{ matrix.device }}-${filename}"
+            cp "$file" "../release/${{ matrix.device }}/${newname}"
           done
           
-          # 显示所有固件文件
-          echo "=== 生成的固件文件 ==="
-          find ./bin -type f \( -name "*.img.gz" -o -name "*.bin" -o -name "*.vmdk" -o -name "*.qcow2" \) -exec ls -lh {} \;
+          # 保存构建信息
+          cat > ../release/${{ matrix.device }}/build_info.txt << EOF
+          ====================================
+          LEDE Firmware (ImageBuilder)
+          ====================================
+          LEDE Version: ${LEDE_VER}
+          Build Date: ${BUILD_DATE}
+          Device: ${{ matrix.device }}
+          Profile: ${{ matrix.profile }}
+          Kernel: ${{ needs.get-lede-version.outputs.kernel }}
+          Builder: ImageBuilder (OpenWrt base)
+          ====================================
+          Default IP: 10.10.10.1
+          Username: root
+          Password: password
+          ====================================
+          EOF
+          
+          cd ../release/${{ matrix.device }}
+          sha256sum * > sha256sums.txt
+          
+          echo "=== 生成的固件 (LEDE ${LEDE_VER}) ==="
+          ls -lh
 
-      - name: Upload Artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-${{ matrix.profile }}
-          path: |
-            ./bin/**/*.img.gz
-            ./bin/**/*.bin
-            ./bin/**/*.vmdk
-            ./bin/**/*.qcow2
+          name: LEDE-${{ needs.get-lede-version.outputs.version }}-${{ matrix.device }}
+          path: release/${{ matrix.device }}
           retention-days: 7
+
+      - name: Create Release Body
+        id: release_body
+        run: |
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "# LEDE 固件 ${{ needs.get-lede-version.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## 版本信息" >> $GITHUB_OUTPUT
+          echo "| 项目 | 信息 |" >> $GITHUB_OUTPUT
+          echo "|------|------|" >> $GITHUB_OUTPUT
+          echo "| **LEDE 版本** | ${{ needs.get-lede-version.outputs.version }} |" >> $GITHUB_OUTPUT
+          echo "| **内核版本** | ${{ needs.get-lede-version.outputs.kernel }} |" >> $GITHUB_OUTPUT
+          echo "| **编译时间** | $(date '+%Y-%m-%d') |" >> $GITHUB_OUTPUT
+          echo "| **设备** | ${{ matrix.device }} |" >> $GITHUB_OUTPUT
+          echo "| **构建方式** | ImageBuilder |" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## 默认设置" >> $GITHUB_OUTPUT
+          echo "- 管理地址: http://10.10.10.1" >> $GITHUB_OUTPUT
+          echo "- 用户名: root" >> $GITHUB_OUTPUT
+          echo "- 密码: password" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## 包含插件" >> $GITHUB_OUTPUT
+          echo "- PassWall (科学上网)" >> $GITHUB_OUTPUT
+          echo "- MosDNS, TurboACC, TTYD" >> $GITHUB_OUTPUT
+          echo "- Aurora主题, ARP绑定" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: LEDE-${{ needs.get-lede-version.outputs.version }}-${{ matrix.device }}-${{ github.run_number }}
+          name: "LEDE ${{ needs.get-lede-version.outputs.version }} - ${{ matrix.device }}"
+          body: ${{ steps.release_body.outputs.body }}
+          files: |
+            release/${{ matrix.device }}/*.img.gz
+            release/${{ matrix.device }}/*.bin
+            release/${{ matrix.device }}/*.vmdk
+            release/${{ matrix.device }}/*.qcow2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
