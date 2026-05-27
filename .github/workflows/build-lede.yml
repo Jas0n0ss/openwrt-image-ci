@@ -1,4 +1,4 @@
-name: Build LEDE Firmware
+name: Build LEDE Firmware for ${{ github.event.inputs.device }}
 
 on:
   workflow_dispatch:
@@ -26,28 +26,40 @@ env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   NODE_OPTIONS: "--max-old-space-size=4096"
 
-
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.device }}" != "all" ]; then
+            # 手动选择单个设备
+            echo "matrix={\"device\":[\"${{ github.event.inputs.device }}\"]}" >> $GITHUB_OUTPUT
+          else
+            # 定时触发或选择 all 时，编译所有设备
+            echo "matrix={\"device\":[\"r2s\",\"cr660x\",\"ax6000\",\"x86_64\",\"raspberrypi-4b\"]}" >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: setup
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
-      matrix:
-        device: [r2s, cr660x, ax6000, x86_64, raspberrypi-4b]
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     name: Build LEDE for ${{ matrix.device }}
 
     steps:
-      - name: Skip if this device is not selected
-        if: |
-          github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.device != 'all' &&
-          github.event.inputs.device != matrix.device
-        run: |
-          echo "跳过 ${{ matrix.device }}，仅编译 ${{ github.event.inputs.device }}"
-          exit 0
-
       - name: Checkout builder config
         uses: actions/checkout@v4
+
+      - name: Checkout LEDE source
+        uses: actions/checkout@v4
+        with:
+          repository: coolsnowwolf/lede
+          path: lede
+          ref: master
 
       - name: Checkout LEDE source
         uses: actions/checkout@v4
