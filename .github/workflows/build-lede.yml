@@ -1,4 +1,4 @@
-name: Build LEDE Firmware
+name: Build LEDE Firmware CI for Multiple Devices
 
 on:
   workflow_dispatch:
