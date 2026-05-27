@@ -2,14 +2,16 @@ name: Check LEDE Upstream
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */6 * * *'   # 每6小时检查一次
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.compare.outputs.changed }}
     steps:
       - name: Get upstream LEDE latest commit
         id: get_upstream
@@ -19,8 +21,8 @@ jobs:
           echo "Latest upstream commit: ${LATEST_COMMIT}"
 
       - name: Restore cached commit
-        id: cache
         uses: actions/cache@v4
+        id: cache
         with:
           path: .upstream_commit
           key: upstream-commit
@@ -40,7 +42,6 @@ jobs:
           fi
           echo "changed=true" >> $GITHUB_OUTPUT
           echo "$LATEST" > .upstream_commit
-          echo "Upstream changed, new commit: ${LATEST}"
 
       - name: Save commit to cache
         if: steps.compare.outputs.changed == 'true'
