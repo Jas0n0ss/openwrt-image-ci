@@ -2,15 +2,17 @@ name: Check LEDE Upstream
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # 每6小时检查一次
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: write
+
 env:
-   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-   
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
