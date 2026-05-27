@@ -17,8 +17,6 @@ on:
           - raspberrypi-4b
   schedule:
     - cron: '0 20 * * 0'
-  push:
-    branches: [main]
 
 permissions:
   contents: write
@@ -76,25 +74,25 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Clone additional plugins
+      - name: Clone additional plugins (if not already in feeds)
         run: |
           cd lede
-          git clone --depth 1 https://github.com/sbwml/luci-app-mosdns.git package/mosdns
-          git clone --depth 1 https://github.com/chenmozhijin/luci-app-turboacc.git package/turboacc
-          git clone --depth 1 https://github.com/tsl0922/ttyd.git package/ttyd
-          git clone --depth 1 https://github.com/eamonxg/luci-theme-aurora.git package/aurora
+          # 这些额外插件源如果不在 feeds 中，则手动克隆
+          git clone --depth 1 https://github.com/sbwml/luci-app-mosdns.git package/mosdns || true
+          git clone --depth 1 https://github.com/chenmozhijin/luci-app-turboacc.git package/turboacc || true
+          git clone --depth 1 https://github.com/tsl0922/ttyd.git package/ttyd || true
+          git clone --depth 1 https://github.com/eamonxg/luci-theme-aurora.git package/aurora || true
 
-      - name: Copy custom files
+      - name: Copy custom files (uci-defaults, banner, etc.)
         run: |
           cd lede
           if [ -d "${{ github.workspace }}/files" ]; then
             cp -rf ${{ github.workspace }}/files/* ./
             chmod +x files/etc/uci-defaults/* 2>/dev/null || true
             chmod +x etc/uci-defaults/* 2>/dev/null || true
-            echo "已复制个性化配置文件"
           fi
 
-      - name: Generate .config
+      - name: Generate .config from preset files
         run: |
           cd lede
           if [ ! -f "${{ github.workspace }}/configs/common.config" ]; then
@@ -105,31 +103,17 @@ jobs:
             echo "错误: ${{ matrix.device }}.config 不存在"
             exit 1
           fi
-          cp ${{ github.workspace }}/configs/common.config .config
+          # 直接合并，不再额外 echo
+          cat ${{ github.workspace }}/configs/common.config > .config
           cat ${{ github.workspace }}/configs/${{ matrix.device }}.config >> .config
-          echo "CONFIG_CCACHE=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-passwall=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-passwall_Including_Hysteria=y" >> .config
-          echo "CONFIG_PACKAGE_xray-core=y" >> .config
-          echo "CONFIG_PACKAGE_sing-box=y" >> .config
-          echo "CONFIG_PACKAGE_v2ray-geodata=y" >> .config
-          echo "CONFIG_PACKAGE_geoview=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-mosdns=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-ttyd=y" >> .config
-          echo "CONFIG_PACKAGE_luci-theme-aurora=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-arpbind=y" >> .config
-          echo "# CONFIG_PACKAGE_vlmcsd is not set" >> .config
+          # 执行 defconfig
           make defconfig
 
       - name: Prebuild core dependencies (toolchain, kernel, xray-core)
         run: |
           cd lede
-          echo "=== 编译 toolchain ==="
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
-          echo "=== 编译内核头文件 ==="
           make target/linux/compile -j$(nproc) || make target/linux/compile -j1 V=s
-          echo "=== 编译 xray-core ==="
           make package/xray-core/compile -j$(nproc) || make package/xray-core/compile -j1 V=s
 
       - name: Download sources
@@ -175,20 +159,9 @@ jobs:
           name: "LEDE Firmware for ${{ matrix.device }} - Build ${{ github.run_number }}"
           body: |
             ## LEDE 固件自动构建
-
             - **设备**: ${{ matrix.device }}
             - **管理地址**: http://10.10.10.1
             - **用户名**: root | **密码**: password
-            - **包含插件**: PassWall, MosDNS, TurboACC, TTYD, Aurora主题
-
-            ### 安装说明
-            | 设备 | 安装方法 |
-            |------|----------|
-            | R2S | 解压 .img.gz 后写入 TF 卡 |
-            | CR660x | 通过 breed 刷入 .bin 文件 |
-            | Redmi AX6000 | 通过 uboot 刷入 |
-            | x86_64 | 写入硬盘或虚拟机直接使用 |
-            | 树莓派4B | 解压 .sdcard.img 后写入 SD 卡 |
           files: |
             release/${{ matrix.device }}/*.img.gz
             release/${{ matrix.device }}/*.bin
