@@ -6,8 +6,6 @@
 
 基于 [coolsnowwolf/lede](https://github.com/coolsnowwolf/lede) 源码，使用 GitHub Actions 自动编译 OpenWrt/LEDE 固件。
 
-**Build by @Jas0n0ss from LEDE**
-
 ---
 
 ## 📱 支持的设备
