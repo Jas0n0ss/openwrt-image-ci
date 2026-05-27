@@ -16,14 +16,15 @@ on:
           - x86_64
           - raspberrypi-4b
   schedule:
-    - cron: '0 20 * * 0'          # 每周日 20:00 UTC（可删除）
+    - cron: '0 20 * * 0'
+  # push 已被移除
 
 permissions:
   contents: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true   # 消除 Node.js 20 弃用警告
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
   build:
@@ -31,16 +32,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [r2s, cr660x, ax6000, x86_64, raspberrypi-4b]
+        device: ${{ fromJSON(
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.device != 'all')
+          && format('["{0}"]', github.event.inputs.device)
+          || '["r2s","cr660x","ax6000","x86_64","raspberrypi-4b"]'
+        ) }}
     name: Build LEDE for ${{ matrix.device }}
 
     steps:
-      - name: Skip unwanted devices on manual trigger
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.device != 'all' && github.event.inputs.device != matrix.device
-        run: |
-          echo "跳过 ${{ matrix.device }}，仅编译 ${{ github.event.inputs.device }}"
-          exit 0
-
       - name: Checkout builder config
         uses: actions/checkout@v4
 
