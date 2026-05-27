@@ -24,6 +24,8 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
 
 jobs:
   build:
@@ -94,17 +96,14 @@ jobs:
       - name: Configure feeds (PassWall official method)
         run: |
           cd lede
-          cp feeds.conf.default feeds.conf.default.bak
           cat > feeds.conf.default << 'EOF'
           src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main
           src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main
           src-git kenzo https://github.com/kenzok8/openwrt-packages.git
           src-git small https://github.com/kenzok8/small.git
           EOF
-          cat feeds.conf.default.bak >> feeds.conf.default
-          rm feeds.conf.default.bak
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          ./scripts/feeds update -a || { echo "ERROR: Feed update failed"; exit 1; }
+          ./scripts/feeds install -a || { echo "ERROR: Feed install failed"; exit 1; }
 
       - name: Clone additional plugins
         run: |
@@ -147,12 +146,21 @@ jobs:
           echo "# CONFIG_PACKAGE_luci-app-dockerman is not set" >> .config
           make defconfig
 
-      - name: Prebuild core dependencies with Go 1.24
+      - name: Prebuild core dependencies with Go
         id: setup_go
         run: |
           cd lede
-          wget -q https://go.dev/dl/go1.24.2.linux-amd64.tar.gz
-          sudo tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz
+          # Get latest stable Go version
+          GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -1 | sed 's/go//' || echo "1.24.2")
+          echo "Using Go version: $GO_VERSION"
+          
+          GO_URL="https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
+          wget -q "$GO_URL" || { 
+            echo "WARNING: Failed to download Go $GO_VERSION, using fallback"
+            wget -q https://go.dev/dl/go1.24.2.linux-amd64.tar.gz
+          }
+          
+          sudo tar -C /usr/local -xzf go*.tar.gz
           echo "/usr/local/go/bin" >> $GITHUB_PATH
           echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
           export PATH=/usr/local/go/bin:$PATH
@@ -172,16 +180,25 @@ jobs:
         run: |
           cd lede
           echo "开始编译 ${{ matrix.device }}: $(date)"
-          ccache -s  # 显示缓存命中情况
-          if make -j$(nproc); then
-            echo "编译成功: $(date)"
+          ccache -s
+          
+          # Attempt parallel build with reduced verbosity
+          if make -j$(nproc) -s 2>&1 | tee build.log | tail -n 20; then
+            echo "编译完成: $(date)"
           else
-            echo "并行编译失败，清理后单线程重试..."
-            make target/linux/clean
-            make package/xray-core/clean
-            make -j1 V=s
+            BUILD_RESULT=$?
+            echo "并行编译失败 (返回码: $BUILD_RESULT)，显示错误信息..."
+            echo "::group::Build Error Details"
+            tail -n 50 build.log
+            echo "::endgroup::"
+            
+            echo "清理后单线程重试..."
+            # Full clean to reset build state
+            make clean distclean 2>/dev/null || true
+            echo "Starting single-threaded verbose rebuild..."
+            make -j1 V=s || exit 1
           fi
-          ccache -s  # 显示最终缓存统计
+          ccache -s
 
       - name: Prepare artifacts
         run: |
