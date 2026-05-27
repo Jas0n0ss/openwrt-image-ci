@@ -94,7 +94,6 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.device }}-
             ccache-
-      # ====================
 
       - name: Setup dependencies
         run: |
