@@ -34,15 +34,13 @@ jobs:
         device: [r2s, cr660x, ax6000, x86_64, raspberrypi-4b]
     name: Build LEDE for ${{ matrix.device }}
 
+    # 如果不是手动触发，或者手动触发选择了 all，或者手动触发选择的设备等于当前矩阵设备，才运行这个 Job
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.device == 'all' ||
+      github.event.inputs.device == matrix.device
+
     steps:
-      - name: Skip if this device is not selected
-        if: |
-          github.event_name == 'workflow_dispatch' &&
-          github.event.inputs.device != 'all' &&
-          github.event.inputs.device != matrix.device
-        run: |
-          echo "跳过 ${{ matrix.device }}，仅编译 ${{ github.event.inputs.device }}"
-          exit 0
       - name: Checkout builder config
         uses: actions/checkout@v4
 
@@ -53,7 +51,7 @@ jobs:
           path: lede
           ref: master
 
-      # ===== 新增缓存步骤 =====
+      # ===== 缓存步骤 =====
       - name: Cache downloads (dl)
         uses: actions/cache@v4
         with:
@@ -77,7 +75,6 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.device }}-
             ccache-
-      # ====================
 
       - name: Setup dependencies
         run: |
@@ -87,6 +84,7 @@ jobs:
             rsync unzip zlib1g-dev file wget subversion patch upx-ucl \
             ccache ecj fastjar jarwrapper java-propose-classpath libz-dev \
             libncurses5-dev libncursesw5-dev
+
       - name: Configure feeds (PassWall official method)
         run: |
           cd lede
@@ -101,6 +99,7 @@ jobs:
           rm feeds.conf.default.bak
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
       - name: Clone additional plugins
         run: |
           cd lede
@@ -108,6 +107,7 @@ jobs:
           git clone --depth 1 https://github.com/chenmozhijin/luci-app-turboacc.git package/turboacc || true
           git clone --depth 1 https://github.com/tsl0922/ttyd.git package/ttyd || true
           git clone --depth 1 https://github.com/eamonxg/luci-theme-aurora.git package/aurora || true
+
       - name: Copy custom files
         run: |
           cd lede
@@ -116,6 +116,7 @@ jobs:
             chmod +x files/etc/uci-defaults/* 2>/dev/null || true
             chmod +x etc/uci-defaults/* 2>/dev/null || true
           fi
+
       - name: Clean problematic packages and generate .config
         run: |
           cd lede
@@ -138,6 +139,7 @@ jobs:
           echo "# CONFIG_PACKAGE_luci-theme-alpha is not set" >> .config
           echo "# CONFIG_PACKAGE_luci-app-dockerman is not set" >> .config
           make defconfig
+
       - name: Prebuild core dependencies with Go 1.24
         id: setup_go
         run: |
@@ -152,10 +154,12 @@ jobs:
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make target/linux/compile -j$(nproc) || make target/linux/compile -j1 V=s
           make package/xray-core/compile -j$(nproc) || make package/xray-core/compile -j1 V=s
+
       - name: Download sources
         run: |
           cd lede
           make download -j16
+
       - name: Compile firmware
         run: |
           cd lede
@@ -170,6 +174,7 @@ jobs:
             make -j1 V=s
           fi
           ccache -s  # 显示最终缓存统计
+
       - name: Prepare artifacts
         run: |
           cd lede
@@ -181,6 +186,7 @@ jobs:
           sha256sum * > sha256sums.txt 2>/dev/null
           echo "=== 生成的固件 ==="
           ls -lh
+          
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
