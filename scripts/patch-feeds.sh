@@ -34,12 +34,16 @@ strip_conflicting_feed_dirs() {
     luci-ssl
     nftables-json
   )
-  for name in "${names[@]}"; do
-    find feeds/kenzo feeds/small -maxdepth 3 -type d -name "$name" 2>/dev/null \
-      | while read -r dir; do
-          rm -rf "$dir"
-          echo "==> Removed conflicting feed package: $dir"
-        done
+  local feed name dir
+  for feed in feeds/kenzo feeds/small; do
+    [ -d "$feed" ] || continue
+    for name in "${names[@]}"; do
+      while IFS= read -r dir; do
+        [ -n "$dir" ] || continue
+        rm -rf "$dir"
+        echo "==> Removed conflicting feed package: $dir"
+      done < <(find "$feed" -maxdepth 3 -type d -name "$name" 2>/dev/null || true)
+    done
   done
 }
 
