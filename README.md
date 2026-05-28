@@ -77,6 +77,10 @@ configs/
   custom-plugins.config     # 插件 Kconfig
 scripts/
   setup-custom-packages.sh  # feeds 与第三方包
+  patch-feeds.sh            # 固定 xray/sing-box Go 版本
+  verify-setup.sh           # feeds 步骤后校验
+  verify-defconfig.sh       # defconfig 与 Kconfig 检查
+  ci-compile.sh             # 下载 + 编译（失败即退出）
   device-matrix.sh          # CI matrix
   pack-firmware.sh          # 产物打包命名
   generate-banner.sh        # 按源码生成 banner
@@ -92,7 +96,7 @@ git clone https://github.com/coolsnowwolf/lede.git && cd lede
 REPO=/path/to/openwrt-lede-builder
 DEVICE=redmi-ax6000
 
-bash "$REPO/scripts/setup-custom-packages.sh" "$(pwd)" lede "$REPO/configs"
+bash "$REPO/scripts/setup-custom-packages.sh" "$(pwd)" append "$REPO/configs"
 bash "$REPO/scripts/generate-banner.sh" lede "$REPO/files"
 bash "$REPO/scripts/bundle-oh-my-bash.sh" "$REPO/files"
 bash "$REPO/scripts/install-files-overlay.sh" "$(pwd)" "$REPO/files"

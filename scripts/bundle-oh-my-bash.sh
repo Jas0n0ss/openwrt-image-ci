@@ -21,4 +21,9 @@ echo "==> Cloning oh-my-bash into $OMB_DIR"
 git clone --depth 1 --branch "$OMB_BRANCH" "$OMB_REPO" "$OMB_DIR"
 rm -rf "$OMB_DIR/.git"
 
+[ -f "$OMB_DIR/oh-my-bash.sh" ] || {
+  echo "ERROR: oh-my-bash clone incomplete at $OMB_DIR" >&2
+  exit 1
+}
+
 echo "==> oh-my-bash bundled ($(du -sh "$OMB_DIR" | awk '{print $1}'))"

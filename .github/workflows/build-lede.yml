@@ -85,7 +85,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: lede/dl
-          key: dl-lede-${{ hashFiles('configs/lede/**', 'configs/custom-plugins.config', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh') }}
+          key: dl-lede-v3-${{ hashFiles('configs/lede/**', 'configs/custom-plugins.config', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh', 'scripts/verify-setup.sh') }}
           restore-keys: |
             dl-lede-
 
@@ -93,7 +93,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: lede/feeds
-          key: feeds-lede-${{ hashFiles('configs/lede/**', 'configs/custom-plugins.config', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh') }}
+          key: feeds-lede-v3-${{ hashFiles('configs/lede/**', 'configs/custom-plugins.config', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh', 'scripts/verify-setup.sh') }}
           restore-keys: |
             feeds-lede-
 
@@ -116,7 +116,8 @@ jobs:
             libncurses5-dev libncursesw5-dev
 
       - name: Setup feeds and custom packages
-        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh lede lede ${{ github.workspace }}/configs
+        working-directory: lede
+        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh . append ${{ github.workspace }}/configs
 
       - name: Prepare firmware overlay
         run: |
@@ -143,27 +144,13 @@ jobs:
           cat ${{ github.workspace }}/configs/custom-plugins.config >> .config
           echo "CONFIG_DEVEL=y" >> .config
           echo "CONFIG_CCACHE=y" >> .config
-          make defconfig
-
-      - name: Download sources
-        run: |
-          cd lede
-          make download -j16 || make download -j8
+          bash ${{ github.workspace }}/scripts/verify-defconfig.sh "$(pwd)"
 
       - name: Compile firmware
         run: |
-          cd lede
-          export PATH="/usr/lib/ccache:$PATH"
-          ulimit -n 65535
           echo "开始编译 ${{ matrix.device }} (platform=${{ steps.cache.outputs.platform }}): $(date)"
-          ccache -s || true
-          if make -j$(nproc); then
-            echo "编译成功: $(date)"
-          else
-            echo "并行编译失败，单线程重试..."
-            make -j1 V=s
-          fi
-          ccache -s
+          bash ${{ github.workspace }}/scripts/ci-compile.sh lede
+          echo "编译完成: $(date)"
 
       - name: Prepare artifacts
         run: |

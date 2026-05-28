@@ -112,7 +112,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: src/dl
-          key: dl-${{ needs.setup.outputs.repo }}-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh') }}
+          key: dl-${{ needs.setup.outputs.repo }}-v3-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh', 'scripts/verify-setup.sh') }}
           restore-keys: |
             dl-${{ needs.setup.outputs.repo }}-
 
@@ -120,7 +120,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: src/feeds
-          key: feeds-${{ needs.setup.outputs.repo }}-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh') }}
+          key: feeds-${{ needs.setup.outputs.repo }}-v3-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh', 'scripts/verify-setup.sh') }}
           restore-keys: |
             feeds-${{ needs.setup.outputs.repo }}-
 
@@ -143,12 +143,8 @@ jobs:
             libz-dev curl cmake jq rename tar
 
       - name: Setup feeds and custom packages
-        run: |
-          FEED_MODE="append"
-          if [ "${{ needs.setup.outputs.repo }}" = "lede" ]; then
-            FEED_MODE="lede"
-          fi
-          bash ${{ github.workspace }}/scripts/setup-custom-packages.sh src "$FEED_MODE" ${{ github.workspace }}/configs
+        working-directory: src
+        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh . append ${{ github.workspace }}/configs
 
       - name: Prepare firmware overlay
         run: |
@@ -182,23 +178,11 @@ jobs:
 
           echo "CONFIG_DEVEL=y" >> .config
           echo "CONFIG_CCACHE=y" >> .config
-          make defconfig
-
-      - name: Download sources
-        run: |
-          cd src
-          make download -j16 || make download -j8
+          bash ${{ github.workspace }}/scripts/verify-defconfig.sh "$(pwd)"
 
       - name: Build firmware
         run: |
-          cd src
-          export PATH="/usr/lib/ccache:$PATH"
-          ulimit -n 65535
-
-          ccache -s || true
-          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
-          make -j$(nproc) || make -j1 V=s
-          ccache -s
+          bash ${{ github.workspace }}/scripts/ci-compile.sh src 1
 
       - name: Pack artifacts
         run: |

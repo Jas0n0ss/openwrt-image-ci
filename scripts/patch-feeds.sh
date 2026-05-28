@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post-feed patches: pin xray-core for OpenWrt golang/host 1.21, strip duplicate kenzo packages.
+# Pin Go-based PassWall packages for OpenWrt golang/host ~1.21; strip stale kenzo dupes.
 # Usage: patch-feeds.sh <src_dir>
 
 set -euo pipefail
@@ -7,17 +7,12 @@ set -euo pipefail
 SRC_DIR="${1:?source directory required}"
 cd "$SRC_DIR"
 
-patch_xray_core() {
-  local mk="feeds/passwall_packages/xray-core/Makefile"
+pin_pkg_makefile() {
+  local mk="$1" ver="$2" hash="$3" label="$4"
   [ -f "$mk" ] || return 0
 
-  # Xray >=25 needs Go 1.25+; LEDE/OpenWrt host golang is typically 1.21.x.
-  local ver hash
-  ver="24.12.31"
-  hash="e3c24b561ab422785ee8b7d4a15e44db159d9aa249eb29a36ad1519c15267be"
-
   if grep -q "PKG_VERSION:=${ver}" "$mk"; then
-    echo "==> xray-core already pinned to ${ver}"
+    echo "==> ${label} already at ${ver}"
     return 0
   fi
 
@@ -25,7 +20,21 @@ patch_xray_core() {
     -e "s/^PKG_VERSION:=.*/PKG_VERSION:=${ver}/" \
     -e "s/^PKG_HASH:=.*/PKG_HASH:=${hash}/" \
     "$mk"
-  echo "==> Pinned xray-core to ${ver} (compatible with golang/host 1.21)"
+  echo "==> Pinned ${label} to ${ver} (golang/host 1.21 compatible)"
+}
+
+patch_passwall_go_packages() {
+  pin_pkg_makefile \
+    "feeds/passwall_packages/xray-core/Makefile" \
+    "24.12.31" \
+    "e3c24b561ab422785ee8b7d4a15e44db159d9aa249eb29a36ad1519c15267be" \
+    "xray-core"
+
+  pin_pkg_makefile \
+    "feeds/passwall_packages/sing-box/Makefile" \
+    "1.11.0" \
+    "d4a48b2fe450041fea2d25955ddc092a62afc8da7bb442b49cb12575123b2edb" \
+    "sing-box"
 }
 
 strip_conflicting_feed_dirs() {
@@ -47,5 +56,5 @@ strip_conflicting_feed_dirs() {
   done
 }
 
-patch_xray_core
+patch_passwall_go_packages
 strip_conflicting_feed_dirs
