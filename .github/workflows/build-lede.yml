@@ -116,7 +116,7 @@ jobs:
             libncurses5-dev libncursesw5-dev
 
       - name: Setup feeds and custom packages
-        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh lede lede
+        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh lede lede ${{ github.workspace }}/configs
 
       - name: Copy custom files
         run: |

@@ -1,50 +1,68 @@
 #!/usr/bin/env bash
 # Setup feeds and clone custom packages for OpenWrt/LEDE builds.
-# Usage: setup-custom-packages.sh <src_dir> [lede|append]
+# Usage: setup-custom-packages.sh <src_dir> [lede|append] [config_root]
 #
-# Only installs feeds/packages required by configs/common.config and
-# configs/custom-plugins.config. Does NOT run "feeds install -a".
+# Keeps kenzo + small feeds for third-party dependency sources, but does NOT
+# run "feeds install -a" (that symlinks every package in packages/luci feeds
+# and floods the log with warnings). Instead:
+#   - feeds install -p kenzo / -p small / passwall feeds
+#   - explicit base libs + packages listed in builder .config files
 
 set -euo pipefail
 
 SRC_DIR="${1:?source directory required (e.g. lede or src)}"
 FEED_MODE="${2:-append}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_ROOT="${3:-${SCRIPT_DIR}/../configs}"
 
 cd "$SRC_DIR"
 
-echo "==> Configuring feeds (mode: $FEED_MODE)"
-if [ "$FEED_MODE" = "lede" ]; then
-  cat > feeds.conf.default << 'EOF'
+PASSWALL_FEEDS='
 src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main
 src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main
+'
+KENZO_SMALL_FEEDS='
+src-git kenzo https://github.com/kenzok8/openwrt-packages.git
+src-git small https://github.com/kenzok8/small.git
+'
+
+echo "==> Configuring feeds (mode: $FEED_MODE)"
+if [ "$FEED_MODE" = "lede" ]; then
+  cat > feeds.conf.default << EOF
+${PASSWALL_FEEDS}
+${KENZO_SMALL_FEEDS}
 src-git packages https://git.openwrt.org/feed/packages.git;openwrt-23.05
 src-git luci https://git.openwrt.org/project/luci.git;openwrt-23.05
 EOF
 else
-  # Append PassWall feeds only; keep upstream feeds.conf (ImmortalWrt/LEDE defaults).
-  if ! grep -q 'passwall_packages' feeds.conf.default 2>/dev/null; then
-    cat >> feeds.conf.default << 'EOF'
-
-src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main
-src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main
-
+  append_feed_line() {
+    local line="$1"
+    [ -n "$line" ] || return 0
+    grep -qF "$line" feeds.conf.default 2>/dev/null || echo "$line" >> feeds.conf.default
+  }
+  while IFS= read -r line; do append_feed_line "$line"; done << EOF
+${PASSWALL_FEEDS}
+${KENZO_SMALL_FEEDS}
 EOF
-  fi
 fi
 
 ./scripts/feeds update -a
 
-echo "==> Installing required feed packages (targeted only)"
+echo "==> Removing conflicting feed packages"
+rm -rf feeds/kenzo/luci-theme-alpha feeds/kenzo/luci-app-dockerman 2>/dev/null || true
+rm -rf feeds/luci/luci-app-dae feeds/luci/luci-app-daed 2>/dev/null || true
+find feeds -name "*fchomo*" -type d -exec rm -rf {} + 2>/dev/null || true
+
+echo "==> Installing required feed packages (targeted)"
 install_pkg() {
   local pkg="$1"
   if ./scripts/feeds install "$pkg" 2>/dev/null; then
     return 0
   fi
-  echo "Skip feed package: $pkg"
   return 1
 }
 
-# Base libraries first (PassWall shadowsocks-* need pcre2/libxml2 in the index)
+# Base libraries first (PassWall / shadowsocks need these in the index)
 BASE_PACKAGES=(
   pcre2 libpcre2 libxml2 libunistring
   libev libsodium c-ares libcurl libudns
@@ -59,12 +77,33 @@ BASE_PACKAGES=(
 )
 
 for pkg in "${BASE_PACKAGES[@]}"; do
-  install_pkg "$pkg" || true
+  install_pkg "$pkg" || echo "Skip feed package: $pkg"
 done
 
-# PassWall feeds (all binaries + LuCI app) — after base deps are linked
-./scripts/feeds install -p passwall_packages
-./scripts/feeds install -p passwall_luci
+# PassWall + kenzo/small (third-party dependency trees; not full packages/luci -a)
+./scripts/feeds install -p passwall_packages 2>/dev/null || true
+./scripts/feeds install -p passwall_luci 2>/dev/null || true
+echo "==> Installing kenzo + small feed packages (dependency sources)"
+./scripts/feeds install -p kenzo 2>/dev/null || true
+./scripts/feeds install -p small 2>/dev/null || true
+
+# Packages explicitly enabled in builder configs (any feed)
+echo "==> Installing packages from builder config files"
+CONFIG_FILES=(
+  "$CONFIG_ROOT/lede/common.config"
+  "$CONFIG_ROOT/immortalwrt/common.config"
+  "$CONFIG_ROOT/custom-plugins.config"
+)
+installed_configs=0
+for cfg in "${CONFIG_FILES[@]}"; do
+  [ -f "$cfg" ] || continue
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] || continue
+    install_pkg "$pkg" || true
+    installed_configs=$((installed_configs + 1))
+  done < <(grep -E '^CONFIG_PACKAGE_[^=]+=y' "$cfg" | sed 's/^CONFIG_PACKAGE_//;s/=y$//')
+done
+echo "    Processed CONFIG_PACKAGE entries from builder configs"
 
 echo "==> Cloning custom packages into package/"
 mkdir -p package

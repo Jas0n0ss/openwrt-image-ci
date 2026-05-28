@@ -148,7 +148,7 @@ jobs:
           if [ "${{ needs.setup.outputs.repo }}" = "lede" ]; then
             FEED_MODE="lede"
           fi
-          bash ${{ github.workspace }}/scripts/setup-custom-packages.sh src "$FEED_MODE"
+          bash ${{ github.workspace }}/scripts/setup-custom-packages.sh src "$FEED_MODE" ${{ github.workspace }}/configs
 
       - name: Copy custom files
         run: |

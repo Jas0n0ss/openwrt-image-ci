@@ -119,7 +119,7 @@ jobs:
             libz-dev curl cmake jq rename tar
 
       - name: Setup feeds and custom packages
-        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh immortalwrt append
+        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh immortalwrt append ${{ github.workspace }}/configs
 
       - name: Copy custom files
         run: |
