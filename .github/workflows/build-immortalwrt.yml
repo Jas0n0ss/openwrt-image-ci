@@ -1,11 +1,10 @@
-
-name: Build LEDE Firmware from GPT
+name: Build ImmortalWrt
 
 on:
   workflow_dispatch:
     inputs:
       device:
-        description: "设备"
+        description: "设备代号 (见 configs/devices.list)"
         required: true
         default: "all"
         type: choice
@@ -33,7 +32,6 @@ env:
   TZ: Asia/Shanghai
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-
   CCACHE_DIR: ~/.ccache
   CCACHE_COMPRESS: "true"
   CCACHE_MAXSIZE: 2G
@@ -41,7 +39,6 @@ env:
 jobs:
   setup:
     runs-on: ubuntu-latest
-
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
 
@@ -58,239 +55,118 @@ jobs:
 
   build:
     needs: setup
-
     runs-on: ubuntu-22.04
-
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
-    name: Build LEDE for ${{ matrix.device }}
+    name: ImmortalWrt ${{ matrix.device }}
 
     steps:
-      ########################################################################
-      # Checkout
-      ########################################################################
-
       - name: Checkout builder config
         uses: actions/checkout@v4
 
-      - name: Checkout LEDE source
+      - name: Checkout ImmortalWrt source
         uses: actions/checkout@v4
         with:
-          repository: coolsnowwolf/lede
+          repository: immortalwrt/immortalwrt
           ref: master
-          path: lede
+          path: immortalwrt
           fetch-depth: 1
-
-      ########################################################################
-      # Free Disk Space
-      ########################################################################
 
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
           sudo docker image prune -af
-
           df -h
-
-      ########################################################################
-      # Cache
-      ########################################################################
 
       - name: Cache downloads
         uses: actions/cache@v4
         with:
-          path: lede/dl
-          key: dl-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
+          path: immortalwrt/dl
+          key: dl-immortalwrt-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
           restore-keys: |
-            dl-${{ matrix.device }}-
-            dl-
-
-      - name: Cache feeds
-        uses: actions/cache@v4
-        with:
-          path: lede/feeds
-          key: feeds-${{ hashFiles('configs/immortalwrt/**') }}
-          restore-keys: |
-            feeds-
+            dl-immortalwrt-${{ matrix.device }}-
+            dl-immortalwrt-
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
+          key: ccache-immortalwrt-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
           restore-keys: |
-            ccache-${{ matrix.device }}-
-            ccache-
+            ccache-immortalwrt-${{ matrix.device }}-
+            ccache-immortalwrt-
 
-      ########################################################################
-      # System Dependencies
-      ########################################################################
-
-      - name: Setup dependencies
+      - name: Install dependencies
         run: |
           sudo apt update
-
-          sudo apt install -y \
-            build-essential \
-            clang \
-            flex \
-            bison \
-            g++ \
-            gawk \
-            gettext \
-            git \
-            libssl-dev \
-            libelf-dev \
-            python3 \
-            python3-dev \
-            python3-distutils \
-            rsync \
-            unzip \
-            zlib1g-dev \
-            file \
-            wget \
-            subversion \
-            patch \
-            upx-ucl \
-            ccache \
-            ecj \
-            fastjar \
-            java-propose-classpath \
-            libncurses5-dev \
-            libncursesw5-dev \
-            libz-dev \
-            curl \
-            cmake \
-            jq \
-            rename \
-            tar
-
-      ########################################################################
-      # Configure Feeds
-      ########################################################################
+          sudo apt install -y build-essential clang flex bison g++ gawk gettext \
+            git libssl-dev libelf-dev python3 python3-dev python3-distutils \
+            rsync unzip zlib1g-dev file wget subversion patch upx-ucl ccache \
+            ecj fastjar java-propose-classpath libncurses5-dev libncursesw5-dev \
+            libz-dev curl cmake jq rename tar
 
       - name: Setup feeds and custom packages
-        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh lede append
-
-      ########################################################################
-      # Copy Custom Files
-      ########################################################################
+        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh immortalwrt append
 
       - name: Copy custom files
         run: |
-          cd lede
-
           if [ -d "${{ github.workspace }}/files" ]; then
-
-            cp -rf ${{ github.workspace }}/files/* ./
-
-            chmod +x files/etc/uci-defaults/* 2>/dev/null || true
-            chmod +x etc/uci-defaults/* 2>/dev/null || true
-
+            cp -rf ${{ github.workspace }}/files/* immortalwrt/
+            chmod +x immortalwrt/files/etc/uci-defaults/* 2>/dev/null || true
+            chmod +x immortalwrt/etc/uci-defaults/* 2>/dev/null || true
           fi
-
-      ########################################################################
-      # Generate Config
-      ########################################################################
 
       - name: Generate .config
         run: |
-          cd lede
-
-          if [ ! -f "${{ github.workspace }}/configs/immortalwrt/common.config" ]; then
-            echo "ERROR: common.config not found"
-            exit 1
-          fi
-
+          cd immortalwrt
           if [ ! -f "${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config" ]; then
             echo "ERROR: ${{ matrix.device }}.config not found"
             exit 1
           fi
-
-          cat ${{ github.workspace }}/configs/immortalwrt/common.config > .config
-          cat ${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config >> .config
+          if [ -f "${{ github.workspace }}/configs/immortalwrt/common.config" ]; then
+            cat ${{ github.workspace }}/configs/immortalwrt/common.config > .config
+            cat ${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config >> .config
+          else
+            cat ${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config > .config
+          fi
           cat ${{ github.workspace }}/configs/custom-plugins.config >> .config
-
           echo "CONFIG_DEVEL=y" >> .config
           echo "CONFIG_CCACHE=y" >> .config
-
           make defconfig
-
-      ########################################################################
-      # Setup Go
-      ########################################################################
 
       - name: Setup Go
         run: |
           GO_VERSION="1.24.2"
-
-          wget -q https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz
-
+          wget -q "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
           sudo rm -rf /usr/local/go
-
-          sudo tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz
-
+          sudo tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
           echo "/usr/local/go/bin" >> $GITHUB_PATH
           echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
 
-      ########################################################################
-      # Download Sources
-      ########################################################################
-
       - name: Download sources
         run: |
-          cd lede
-
+          cd immortalwrt
+          export PATH=/usr/local/go/bin:$PATH
           make download -j8 || make download -j1 V=s
 
-      ########################################################################
-      # Build Toolchain
-      ########################################################################
-
-      - name: Build toolchain
+      - name: Build firmware
         run: |
-          cd lede
-
-          export PATH=/usr/local/go/bin:$PATH
+          cd immortalwrt
+          export PATH="/usr/lib/ccache:/usr/local/go/bin:$PATH"
           export GOROOT=/usr/local/go
-
-          go version
-
-          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
-
-      ########################################################################
-      # Compile Firmware
-      ########################################################################
-
-      - name: Compile firmware
-        run: |
-          cd lede
-
-          export PATH="/usr/lib/ccache:$PATH"
-
           ulimit -n 65535
-
-          echo "Build started: $(date)"
-
+          echo "Build ImmortalWrt ${{ matrix.device }}: $(date)"
           ccache -z
-
+          make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make -j$(nproc) || make -j1 V=s
-
-          echo "Build finished: $(date)"
-
           ccache -s
-
-      ########################################################################
-      # Prepare Artifacts
-      ########################################################################
+          echo "Finished: $(date)"
 
       - name: Prepare artifacts
         run: |
-          cd lede
+          cd immortalwrt
           bash ${{ github.workspace }}/scripts/pack-firmware.sh \
             "${{ matrix.device }}" \
             "immortalwrt" \
@@ -298,36 +174,28 @@ jobs:
             "bin/targets" \
             "../release/${{ matrix.device }}"
 
-      ########################################################################
-      # Upload Artifacts
-      ########################################################################
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: lede-${{ matrix.device }}
+          name: immortalwrt-${{ matrix.device }}
           path: release/${{ matrix.device }}
           retention-days: 7
-
-      ########################################################################
-      # Release
-      ########################################################################
 
       - name: Release
         if: success() && github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: Jas0n0ss-immortalwrt-${{ matrix.device }}-${{ github.run_number }}
-          name: "Jas0n0ss OpenWrt (immortalwrt) — ${{ matrix.device }} (#${{ github.run_number }})"
+          name: "Jas0n0ss ImmortalWrt — ${{ matrix.device }} (#${{ github.run_number }})"
           body: |
-            ## Jas0n0ss OpenWrt
+            ## Jas0n0ss ImmortalWrt
 
-            - **Device**: `${{ matrix.device }}`
-            - **Naming**: `Jas0n0ss-immortalwrt-<key>-<device>-<platform>-<type>.<ext>`
-            - **Source**: https://github.com/Jas0n0ss/openwrt-lede-builder
-            - **Default IP**: http://10.10.10.1
-            - **Login**: root / password
+            - **源码**: [immortalwrt/immortalwrt](https://github.com/immortalwrt/immortalwrt)
+            - **设备代号**: `${{ matrix.device }}`
+            - **固件命名**: `Jas0n0ss-immortalwrt-<代号>-<设备>-<平台>-<类型>.<后缀>`
+            - **配置仓库**: https://github.com/Jas0n0ss/openwrt-lede-builder
+            - **管理地址**: http://10.10.10.1
+            - **登录**: root / password
           files: release/${{ matrix.device }}/Jas0n0ss-*
-
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

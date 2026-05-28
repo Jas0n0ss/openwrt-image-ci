@@ -1,6 +1,7 @@
 # OpenWrt / LEDE 固件自动构建
 
 [![Build LEDE](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-lede.yml?branch=main)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-lede.yml)
+[![Build ImmortalWrt](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-immortalwrt.yml?branch=main)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-immortalwrt.yml)
 [![GitHub release](https://img.shields.io/github/v/release/Jas0n0ss/openwrt-lede-builder)](https://github.com/Jas0n0ss/openwrt-lede-builder/releases)
 [![License](https://img.shields.io/github/license/Jas0n0ss/openwrt-lede-builder)](https://github.com/Jas0n0ss/openwrt-lede-builder/blob/main/LICENSE)
 
@@ -90,9 +91,9 @@ Jas0n0ss-<源码>-<代号>-<OpenWrt设备名>-<平台>-<类型>.<后缀>
 
 | 工作流 | 用途 |
 |--------|------|
-| **Build LEDE Firmware** | LEDE 源码 + `configs/lede/` |
-| **Build LEDE Firmware from GPT** | LEDE 源码 + `configs/immortalwrt/` |
-| **Build OpenWrt (LEDE + ImmortalWrt)** | 可选 LEDE 或 ImmortalWrt 官方源码 |
+| **Build LEDE Firmware** | [coolsnowwolf/lede](https://github.com/coolsnowwolf/lede) + `configs/lede/` |
+| **Build ImmortalWrt** | [immortalwrt/immortalwrt](https://github.com/immortalwrt/immortalwrt) + `configs/immortalwrt/` |
+| **Build OpenWrt (LEDE + ImmortalWrt)** | 手动选择 LEDE 或 ImmortalWrt 源码（同上） |
 | **Check OpenWrt Upstream** | 检测上游更新并自动触发构建 |
 
 ### 手动编译
