@@ -2,7 +2,7 @@ name: Check OpenWrt Upstream
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # 每 6 小时检查一次
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -11,47 +11,62 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
   check:
     runs-on: ubuntu-latest
+
     steps:
-      # 获取 LEDE 最新提交
-      - name: Get upstream LEDE latest commit
-        id: get_upstream
+      ####################################################################
+      # 1. 获取 upstream commit
+      ####################################################################
+      - name: Get LEDE latest commit
+        id: lede
         run: |
-          LATEST_LEDE=$(curl -s https://api.github.com/repos/coolsnowwolf/lede/commits/master | jq -r '.sha')
-          echo "lede_commit=${LATEST_LEDE}" >> $GITHUB_OUTPUT
+          LEDE=$(curl -s https://api.github.com/repos/coolsnowwolf/lede/commits/master | jq -r '.sha')
+          echo "commit=$LEDE" >> $GITHUB_OUTPUT
 
-      # 获取 ImmortalWrt 最新提交
-      - name: Get upstream ImmortalWrt latest commit
-        id: get_immortal
+      - name: Get ImmortalWrt latest commit
+        id: immortal
         run: |
-          LATEST_IMM=$(curl -s https://api.github.com/repos/immortalwrt/immortalwrt/commits/master | jq -r '.sha')
-          echo "immortal_commit=${LATEST_IMM}" >> $GITHUB_OUTPUT
+          IMM=$(curl -s https://api.github.com/repos/immortalwrt/immortalwrt/commits/master | jq -r '.sha')
+          echo "commit=$IMM" >> $GITHUB_OUTPUT
 
-      # 恢复缓存上次检查的 commit
-      - name: Restore cached commit
+      ####################################################################
+      # 2. restore cache
+      ####################################################################
+      - name: Restore cache
         uses: actions/cache@v4
         with:
           path: .upstream_commit
           key: upstream-commit
 
-      # 比较最新提交，如果有变化则触发 CI
-      - name: Compare and trigger
+      ####################################################################
+      # 3. compare + trigger (已修复 mkdir crash)
+      ####################################################################
+      - name: Compare and trigger builds
         run: |
-          LEDE_LATEST=${{ steps.get_upstream.outputs.lede_commit }}
-          IMM_LATEST=${{ steps.get_immortal.outputs.immortal_commit }}
+          LEDE_LATEST="${{ steps.lede.outputs.commit }}"
+          IMM_LATEST="${{ steps.immortal.outputs.commit }}"
 
           TRIGGER=false
+
+          # ===== 修复点：避免 file/dir 冲突 =====
+          if [ -e .upstream_commit ] && [ ! -d .upstream_commit ]; then
+            rm -f .upstream_commit
+          fi
           mkdir -p .upstream_commit
 
-          # 检查 LEDE
+          echo "LEDE: $LEDE_LATEST"
+          echo "IMM: $IMM_LATEST"
+
+          ####################################
+          # LEDE check
+          ####################################
           if [ -f .upstream_commit/lede ]; then
-            LEDE_CACHED=$(cat .upstream_commit/lede)
-            if [ "$LEDE_LATEST" != "$LEDE_CACHED" ]; then
-              echo "LEDE updated: $LEDE_LATEST"
+            OLD=$(cat .upstream_commit/lede)
+            if [ "$OLD" != "$LEDE_LATEST" ]; then
+              echo "LEDE updated"
               TRIGGER=true
             fi
           else
@@ -59,11 +74,13 @@ jobs:
           fi
           echo "$LEDE_LATEST" > .upstream_commit/lede
 
-          # 检查 ImmortalWrt
+          ####################################
+          # ImmortalWrt check
+          ####################################
           if [ -f .upstream_commit/immortalwrt ]; then
-            IMM_CACHED=$(cat .upstream_commit/immortalwrt)
-            if [ "$IMM_LATEST" != "$IMM_CACHED" ]; then
-              echo "ImmortalWrt updated: $IMM_LATEST"
+            OLD=$(cat .upstream_commit/immortalwrt)
+            if [ "$OLD" != "$IMM_LATEST" ]; then
+              echo "ImmortalWrt updated"
               TRIGGER=true
             fi
           else
@@ -71,25 +88,32 @@ jobs:
           fi
           echo "$IMM_LATEST" > .upstream_commit/immortalwrt
 
+          ####################################
+          # trigger build workflow
+          ####################################
           if [ "$TRIGGER" = true ]; then
-            echo "Triggering build workflow..."
-            # 触发 ImmortalWrt 构建
-            curl -X POST \
+            echo "Trigger build-lede-immortalwrt.yml"
+
+            curl -s -X POST \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-lede-immortalwrt.yml/dispatches \
               -d '{"ref":"main","inputs":{"source":"immortalwrt","device":"all"}}'
 
-            # 触发 LEDE 构建
-            curl -X POST \
+            curl -s -X POST \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-lede-immortalwrt.yml/dispatches \
               -d '{"ref":"main","inputs":{"source":"lede","device":"all"}}'
+
           else
-            echo "No upstream changes detected."
+            echo "No upstream changes detected"
           fi
 
-      # 保存缓存
-      - name: Save commit to cache
+      ####################################################################
+      # 4. save cache
+      ####################################################################
+      - name: Save cache
         uses: actions/cache@v4
         with:
           path: .upstream_commit
