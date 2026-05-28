@@ -34,7 +34,8 @@ env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   CCACHE_DIR: ~/.ccache
   CCACHE_COMPRESS: "true"
-  CCACHE_MAXSIZE: 2G
+  CCACHE_COMPRESSLEVEL: "6"
+  CCACHE_MAXSIZE: 10G
 
 jobs:
   setup:
@@ -74,28 +75,40 @@ jobs:
           path: immortalwrt
           fetch-depth: 1
 
+      - name: Resolve cache platform
+        id: cache
+        run: |
+          echo "platform=$(bash scripts/cache-platform.sh configs/immortalwrt/${{ matrix.device }}.config)" >> $GITHUB_OUTPUT
+
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
           sudo docker image prune -af
           df -h
 
-      - name: Cache downloads
+      - name: Cache downloads (dl)
         uses: actions/cache@v4
         with:
           path: immortalwrt/dl
-          key: dl-immortalwrt-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
+          key: dl-immortalwrt-${{ hashFiles('configs/immortalwrt/**', 'configs/custom-plugins.config', 'scripts/setup-custom-packages.sh') }}
           restore-keys: |
-            dl-immortalwrt-${{ matrix.device }}-
             dl-immortalwrt-
+
+      - name: Cache feeds
+        uses: actions/cache@v4
+        with:
+          path: immortalwrt/feeds
+          key: feeds-immortalwrt-${{ hashFiles('configs/immortalwrt/**', 'configs/custom-plugins.config', 'scripts/setup-custom-packages.sh') }}
+          restore-keys: |
+            feeds-immortalwrt-
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-immortalwrt-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
+          key: ccache-immortalwrt-${{ steps.cache.outputs.platform }}-${{ hashFiles('configs/immortalwrt/**', 'configs/custom-plugins.config') }}
           restore-keys: |
-            ccache-immortalwrt-${{ matrix.device }}-
+            ccache-immortalwrt-${{ steps.cache.outputs.platform }}-
             ccache-immortalwrt-
 
       - name: Install dependencies
@@ -157,8 +170,8 @@ jobs:
           export PATH="/usr/lib/ccache:/usr/local/go/bin:$PATH"
           export GOROOT=/usr/local/go
           ulimit -n 65535
-          echo "Build ImmortalWrt ${{ matrix.device }}: $(date)"
-          ccache -z
+          echo "Build ImmortalWrt ${{ matrix.device }} (platform=${{ steps.cache.outputs.platform }}): $(date)"
+          ccache -s || true
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make -j$(nproc) || make -j1 V=s
           ccache -s

@@ -31,6 +31,13 @@
 
 > 已移除旧代号 `ax6000`、`cr660x`，请改用 `redmi-ax6000`、`xiaomi-cr660x`。
 
+### 编译加速（全量 + 全插件）
+
+保留 PassWall / MosDNS 等全部插件，仅通过 **dl / feeds / ccache** 缓存加速。详见 [docs/build-speed.md](docs/build-speed.md)。
+
+- 日常建议只编 **单台** 设备；同平台机型（如 `redmi-ax6000` 与 `xiaomi-ax6000`）共享 ccache。
+- 避免频繁使用 `all`，否则 11 路并行会争抢 GitHub 缓存与 CPU。
+
 ### 固件文件命名
 
 Release / Artifacts **仅包含最终可刷写的固件**（不含 `sha256sums`、manifest、内核碎片等）。

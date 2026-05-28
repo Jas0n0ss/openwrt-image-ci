@@ -43,7 +43,8 @@ env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   CCACHE_DIR: ~/.ccache
   CCACHE_COMPRESS: "true"
-  CCACHE_MAXSIZE: 2G
+  CCACHE_COMPRESSLEVEL: "6"
+  CCACHE_MAXSIZE: 10G
 
 jobs:
   setup:
@@ -98,28 +99,40 @@ jobs:
           path: src
           fetch-depth: 1
 
+      - name: Resolve cache platform
+        id: cache
+        run: |
+          echo "platform=$(bash scripts/cache-platform.sh configs/${{ needs.setup.outputs.repo }}/${{ matrix.device }}.config)" >> $GITHUB_OUTPUT
+
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
           sudo docker image prune -af
           df -h
 
-      - name: Cache downloads
+      - name: Cache downloads (dl)
         uses: actions/cache@v4
         with:
           path: src/dl
-          key: dl-${{ needs.setup.outputs.repo }}-${{ matrix.device }}-${{ hashFiles('configs/**') }}
+          key: dl-${{ needs.setup.outputs.repo }}-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
           restore-keys: |
-            dl-${{ needs.setup.outputs.repo }}-${{ matrix.device }}-
             dl-${{ needs.setup.outputs.repo }}-
+
+      - name: Cache feeds
+        uses: actions/cache@v4
+        with:
+          path: src/feeds
+          key: feeds-${{ needs.setup.outputs.repo }}-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
+          restore-keys: |
+            feeds-${{ needs.setup.outputs.repo }}-
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ needs.setup.outputs.repo }}-${{ matrix.device }}-${{ hashFiles('configs/**') }}
+          key: ccache-${{ needs.setup.outputs.repo }}-${{ steps.cache.outputs.platform }}-${{ hashFiles('configs/**', 'configs/custom-plugins.config') }}
           restore-keys: |
-            ccache-${{ needs.setup.outputs.repo }}-${{ matrix.device }}-
+            ccache-${{ needs.setup.outputs.repo }}-${{ steps.cache.outputs.platform }}-
             ccache-${{ needs.setup.outputs.repo }}-
 
       - name: Install dependencies
@@ -194,7 +207,7 @@ jobs:
           export GOROOT=/usr/local/go
           ulimit -n 65535
 
-          ccache -z
+          ccache -s || true
           make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
           make -j$(nproc) || make -j1 V=s
           ccache -s
