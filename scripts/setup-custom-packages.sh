@@ -79,21 +79,7 @@ echo "==> Installing PassWall feeds (required)"
 ./scripts/feeds install -p passwall_luci
 
 bash "${SCRIPT_DIR}/patch-feeds.sh" "$(pwd)"
-bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)"
-
-echo "==> Installing packages from builder config files"
-CONFIG_FILES=(
-  "$CONFIG_ROOT/lede/common.config"
-  "$CONFIG_ROOT/immortalwrt/common.config"
-  "$CONFIG_ROOT/custom-plugins.config"
-)
-for cfg in "${CONFIG_FILES[@]}"; do
-  [ -f "$cfg" ] || continue
-  while IFS= read -r pkg; do
-    [ -n "$pkg" ] || continue
-    install_pkg "$pkg" 2>/dev/null || echo "    skip config package: $pkg"
-  done < <(grep -E '^CONFIG_PACKAGE_[^=]+=y' "$cfg" | sed 's/^CONFIG_PACKAGE_//;s/=y$//')
-done
+bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)" feeds
 
 echo "==> Cloning custom packages into package/"
 mkdir -p package
@@ -129,5 +115,19 @@ if [ ! -d package/luci-app-arpbind ]; then
   echo "    installed luci-app-arpbind"
 fi
 
-bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)"
+echo "==> Installing packages from builder config files"
+CONFIG_FILES=(
+  "$CONFIG_ROOT/lede/common.config"
+  "$CONFIG_ROOT/immortalwrt/common.config"
+  "$CONFIG_ROOT/custom-plugins.config"
+)
+for cfg in "${CONFIG_FILES[@]}"; do
+  [ -f "$cfg" ] || continue
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] || continue
+    install_pkg "$pkg" 2>/dev/null || echo "    skip config package: $pkg"
+  done < <(grep -E '^CONFIG_PACKAGE_[^=]+=y' "$cfg" | sed 's/^CONFIG_PACKAGE_//;s/=y$//')
+done
+
+bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)" full
 echo "==> Custom package setup finished"

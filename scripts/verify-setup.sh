@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Fail fast if feed setup did not produce a buildable tree.
-# Usage: verify-setup.sh <src_dir>
+# Usage: verify-setup.sh <src_dir> [feeds|full]
+#   feeds — PassWall feeds + xray/sing-box pins only (before custom package clones)
+#   full  — default; includes package/luci-app-mosdns etc.
 
 set -euo pipefail
 
 SRC_DIR="${1:?source directory required}"
+MODE="${2:-full}"
 cd "$SRC_DIR"
 
 fail() {
@@ -29,10 +32,12 @@ if [ ! -f feeds/passwall_luci/luci-app-passwall/Makefile ] \
   fail "luci-app-passwall not installed from passwall_luci feed"
 fi
 
-for pkg in luci-app-mosdns luci-app-turboacc luci-theme-aurora; do
-  [ -d "package/${pkg}" ] || fail "missing custom package/${pkg}"
-done
+if [ "$MODE" = "full" ]; then
+  for pkg in luci-app-mosdns luci-app-turboacc luci-theme-aurora; do
+    [ -d "package/${pkg}" ] || fail "missing custom package/${pkg}"
+  done
+fi
 
-[ -f package/Makefile ] || [ -d package ] || fail "package/ directory missing"
+[ -d package ] || fail "package/ directory missing"
 
-echo "==> verify-setup: OK"
+echo "==> verify-setup (${MODE}): OK"
