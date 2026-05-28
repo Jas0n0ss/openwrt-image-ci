@@ -101,7 +101,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: lede/dl
-          key: dl-${{ matrix.device }}-${{ hashFiles('configs/**') }}
+          key: dl-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
           restore-keys: |
             dl-${{ matrix.device }}-
             dl-
@@ -118,7 +118,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ matrix.device }}-${{ hashFiles('configs/**') }}
+          key: ccache-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/**') }}
           restore-keys: |
             ccache-${{ matrix.device }}-
             ccache-
@@ -297,18 +297,18 @@ jobs:
         run: |
           cd lede
 
-          if [ ! -f "${{ github.workspace }}/configs/common.config" ]; then
+          if [ ! -f "${{ github.workspace }}/configs/immortalwrt/common.config" ]; then
             echo "ERROR: common.config not found"
             exit 1
           fi
 
-          if [ ! -f "${{ github.workspace }}/configs/${{ matrix.device }}.config" ]; then
+          if [ ! -f "${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config" ]; then
             echo "ERROR: ${{ matrix.device }}.config not found"
             exit 1
           fi
 
-          cat ${{ github.workspace }}/configs/common.config > .config
-          cat ${{ github.workspace }}/configs/${{ matrix.device }}.config >> .config
+          cat ${{ github.workspace }}/configs/immortalwrt/common.config > .config
+          cat ${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config >> .config
 
           echo "CONFIG_DEVEL=y" >> .config
           echo "CONFIG_CCACHE=y" >> .config

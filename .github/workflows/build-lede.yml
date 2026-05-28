@@ -63,7 +63,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: lede/dl
-          key: dl-${{ matrix.device }}-${{ hashFiles('configs/common.config', 'configs/${{ matrix.device }}.config') }}
+          key: dl-${{ matrix.device }}-${{ hashFiles('configs/lede/common.config', 'configs/lede/${{ matrix.device }}.config') }}
           restore-keys: |
             dl-${{ matrix.device }}-
             dl-
@@ -190,16 +190,16 @@ jobs:
           rm -rf feeds/luci/luci-app-dae 2>/dev/null || true
           rm -rf feeds/luci/luci-app-daed 2>/dev/null || true
           find feeds -name "*fchomo*" -type d -exec rm -rf {} + 2>/dev/null || true
-          if [ ! -f "${{ github.workspace }}/configs/common.config" ]; then
+          if [ ! -f "${{ github.workspace }}/configs/lede/common.config" ]; then
             echo "错误: common.config 不存在"
             exit 1
           fi
-          if [ ! -f "${{ github.workspace }}/configs/${{ matrix.device }}.config" ]; then
+          if [ ! -f "${{ github.workspace }}/configs/lede/${{ matrix.device }}.config" ]; then
             echo "错误: ${{ matrix.device }}.config 不存在"
             exit 1
           fi
-          cat ${{ github.workspace }}/configs/common.config > .config
-          cat ${{ github.workspace }}/configs/${{ matrix.device }}.config >> .config
+          cat ${{ github.workspace }}/configs/lede/common.config > .config
+          cat ${{ github.workspace }}/configs/lede/${{ matrix.device }}.config >> .config
 
           make defconfig
 
