@@ -1,0 +1,22 @@
+---
+description: Git commit author must be Jas0n0ss, not Cursor Agent
+alwaysApply: true
+---
+
+# Git commits
+
+When creating commits in this repository:
+
+- **Author:** `Jas0n0ss <Jas0n0ss@hotmail.com>`
+- **Never** commit as `cursoragent`, `Cursor Agent`, or any Cursor default identity.
+- Use explicit author on every commit:
+
+```bash
+git commit --author="Jas0n0ss <Jas0n0ss@hotmail.com>" -m "$(cat <<'EOF'
+message here
+EOF
+)"
+```
+
+- Do **not** run `git config` to change user.name/user.email (user manages that locally).
+- Before pushing, verify: `git log -1 --format='%an <%ae>'` must show Jas0n0ss.
