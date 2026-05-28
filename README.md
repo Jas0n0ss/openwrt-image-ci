@@ -76,8 +76,11 @@ Jas0n0ss-<源码>-<代号>-<OpenWrt设备名>-<平台>-<类型>.<后缀>
 | **TTYD** | 网页终端 | `ttyd`, `luci-app-ttyd`（来自官方 packages / luci feeds） |
 | **ARP 绑定** | 静态 IP/MAC 绑定 | `luci-app-arpbind` |
 | **Aurora 主题** | 现代化 LuCI 主题 | `luci-theme-aurora` |
+| **oh-my-bash** | SSH 交互式 Shell 体验 | 预装于 `/etc/oh-my-bash`，`bash` 为 root 默认登录 Shell |
 
 首次刷机后 LuCI 默认主题为 Aurora（见 `files/etc/uci-defaults/99-custom`）。
+
+SSH Banner：**LEDE** 用上游六边形（`LE/DE`）；**ImmortalWrt** 用上游 `BE FREE AND UNAFRAID` 字体（非六边形）。底部为 `@Jas0n0ss` 与 LuCI 地址。模板见 `scripts/banners/*.banner`。
 
 ---
 
@@ -91,6 +94,8 @@ Jas0n0ss-<源码>-<代号>-<OpenWrt设备名>-<平台>-<类型>.<后缀>
 | DHCP 范围 | 10.10.10.100 – 10.10.10.250 |
 | 时区 | Asia/Shanghai |
 | 主题 | Aurora |
+| SSH | Dropbear + `/etc/banner`（Jas0n0ss 品牌） |
+| Shell | `bash` + oh-my-bash（`/etc/oh-my-bash`） |
 
 ---
 
@@ -123,7 +128,10 @@ scripts/
   device-matrix.sh   # 生成 GitHub Actions matrix
   pack-firmware.sh   # 仅打包并重命名最终固件
   setup-custom-packages.sh  # feeds + 插件源码
-files/               # 刷机后 overlay（IP、主题、banner 等）
+  generate-banner.sh        # 写入 repo 的 files/etc/banner
+  install-files-overlay.sh  # 复制到 <源码>/files/（OpenWrt 正确路径）
+  bundle-oh-my-bash.sh      # 将 oh-my-bash 打入 files overlay
+files/               # 仓库 overlay 源（CI 会复制到 lede/files/ 或 immortalwrt/files/）
 ```
 
 ---

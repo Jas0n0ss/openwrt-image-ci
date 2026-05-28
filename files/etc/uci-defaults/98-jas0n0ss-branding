@@ -9,8 +9,15 @@ if [ -f /etc/openwrt_release ]; then
   sed -i '/^DISTRIB_DESCRIPTION=/d' /etc/openwrt_release
   sed -i '/^DISTRIB_REVISION=/d' /etc/openwrt_release
   sed -i '/^DISTRIB_TAINTS=/d' /etc/openwrt_release
+  _src='openwrt'
+  [ -f /etc/jas0n0ss-build-source ] && _src=$(cat /etc/jas0n0ss-build-source)
+  case "$_src" in
+    lede) _label='Jas0n0ss OpenWrt (LEDE)' ;;
+    immortalwrt) _label='Jas0n0ss OpenWrt (ImmortalWrt)' ;;
+    *) _label='Jas0n0ss OpenWrt' ;;
+  esac
   printf "%s\n" \
-    "DISTRIB_DESCRIPTION='Jas0n0ss OpenWrt'" \
+    "DISTRIB_DESCRIPTION='${_label}'" \
     "DISTRIB_REVISION='${BUILDER_URL}'" \
     >> /etc/openwrt_release
 fi

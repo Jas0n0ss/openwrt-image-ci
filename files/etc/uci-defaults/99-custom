@@ -14,10 +14,6 @@ uci commit dhcp
 uci set luci.main.mediaurlbase='/luci-static/aurora'
 uci commit luci
 
-cat > /etc/ssh/sshd_config.d/99-welcome << 'EOF'
-Banner /etc/banner
-EOF
-
 cat >> /etc/sysctl.conf << 'EOF'
 net.core.rmem_default=262144
 net.core.wmem_default=262144

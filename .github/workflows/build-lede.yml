@@ -118,14 +118,14 @@ jobs:
       - name: Setup feeds and custom packages
         run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh lede lede ${{ github.workspace }}/configs
 
-      - name: Copy custom files
+      - name: Prepare firmware overlay
         run: |
-          cd lede
-          if [ -d "${{ github.workspace }}/files" ]; then
-            cp -rf ${{ github.workspace }}/files/* ./
-            chmod +x files/etc/uci-defaults/* 2>/dev/null || true
-            chmod +x etc/uci-defaults/* 2>/dev/null || true
-          fi
+          bash ${{ github.workspace }}/scripts/generate-banner.sh lede ${{ github.workspace }}/files
+          bash ${{ github.workspace }}/scripts/bundle-oh-my-bash.sh ${{ github.workspace }}/files
+
+      - name: Copy custom files
+        run: bash ${{ github.workspace }}/scripts/install-files-overlay.sh lede ${{ github.workspace }}/files
+        working-directory: ${{ github.workspace }}
 
       - name: Generate .config
         run: |

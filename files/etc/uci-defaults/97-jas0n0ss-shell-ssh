@@ -1,0 +1,27 @@
+#!/bin/sh
+# oh-my-bash login shell + Dropbear SSH banner (OpenWrt UCI)
+
+# --- Dropbear SSH banner (not OpenSSH sshd_config.d) ---
+if [ -f /etc/config/dropbear ]; then
+  uci -q batch <<'EOF'
+set dropbear.@dropbear[0].BannerFile='/etc/banner'
+EOF
+  uci commit dropbear
+  /etc/init.d/dropbear enabled 2>/dev/null || true
+  /etc/init.d/dropbear restart 2>/dev/null || true
+fi
+
+# --- bash as root login shell for SSH oh-my-bash ---
+if [ -x /usr/bin/bash ]; then
+  grep -q '/usr/bin/bash' /etc/shells 2>/dev/null || echo '/usr/bin/bash' >> /etc/shells
+  if grep -q '^root:.*:/bin/ash$' /etc/passwd; then
+    sed -i 's#^root:\([^:]*\):\([^:]*\):\([^:]*\):\([^:]*\):\([^:]*\):/bin/ash$#root:\1:\2:\3:\4:\5:/usr/bin/bash#' /etc/passwd
+  fi
+fi
+
+# --- ensure oh-my-bash path exists (first-boot sanity) ---
+if [ ! -f /etc/oh-my-bash/oh-my-bash.sh ]; then
+  logger -t jas0n0ss "oh-my-bash missing under /etc/oh-my-bash — rebuild firmware with bundle-oh-my-bash.sh"
+fi
+
+exit 0

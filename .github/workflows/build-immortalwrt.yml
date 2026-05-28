@@ -121,13 +121,14 @@ jobs:
       - name: Setup feeds and custom packages
         run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh immortalwrt append ${{ github.workspace }}/configs
 
-      - name: Copy custom files
+      - name: Prepare firmware overlay
         run: |
-          if [ -d "${{ github.workspace }}/files" ]; then
-            cp -rf ${{ github.workspace }}/files/* immortalwrt/
-            chmod +x immortalwrt/files/etc/uci-defaults/* 2>/dev/null || true
-            chmod +x immortalwrt/etc/uci-defaults/* 2>/dev/null || true
-          fi
+          bash ${{ github.workspace }}/scripts/generate-banner.sh immortalwrt ${{ github.workspace }}/files
+          bash ${{ github.workspace }}/scripts/bundle-oh-my-bash.sh ${{ github.workspace }}/files
+
+      - name: Copy custom files
+        run: bash ${{ github.workspace }}/scripts/install-files-overlay.sh immortalwrt ${{ github.workspace }}/files
+        working-directory: ${{ github.workspace }}
 
       - name: Generate .config
         run: |

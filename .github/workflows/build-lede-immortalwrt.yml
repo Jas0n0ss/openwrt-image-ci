@@ -150,13 +150,14 @@ jobs:
           fi
           bash ${{ github.workspace }}/scripts/setup-custom-packages.sh src "$FEED_MODE" ${{ github.workspace }}/configs
 
-      - name: Copy custom files
+      - name: Prepare firmware overlay
         run: |
-          if [ -d "${{ github.workspace }}/files" ]; then
-            cp -rf ${{ github.workspace }}/files/* src/
-            chmod +x src/files/etc/uci-defaults/* 2>/dev/null || true
-            chmod +x src/etc/uci-defaults/* 2>/dev/null || true
-          fi
+          bash ${{ github.workspace }}/scripts/generate-banner.sh ${{ needs.setup.outputs.repo }} ${{ github.workspace }}/files
+          bash ${{ github.workspace }}/scripts/bundle-oh-my-bash.sh ${{ github.workspace }}/files
+
+      - name: Copy custom files
+        run: bash ${{ github.workspace }}/scripts/install-files-overlay.sh src ${{ github.workspace }}/files
+        working-directory: ${{ github.workspace }}
 
       - name: Generate .config
         run: |
