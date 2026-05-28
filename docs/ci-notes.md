@@ -64,6 +64,25 @@
 
 `ci-resolve-build.sh` 仅向 stdout 写 `repo=`、`upstream=`、`matrix=`；`ci-validate-configs.sh` 日志走 stderr，避免污染 `GITHUB_OUTPUT`。
 
+## 设备 WiFi / 核心包
+
+- 全设备合并 `configs/snippets/wireless-core.config`（`iw`、`wireless-regdb`、`cfg80211`、`mac80211`）。
+- **LEDE K2P**：`kmod-mt7615d` + `kmod-mt7615d_dbdc` + `maccalc` + `wireless-tools`（lean 闭源驱动）。
+- **ImmortalWrt K2P**：`kmod-mt7615e` + `kmod-mt7615-firmware`（主线 mt76，**不要** `mt7615d_dbdc`）。
+- **ImmortalWrt filogic**（WR30U / AX6000）：target 须为 `*-stock`；驱动包含 `kmod-mt7915e` + 对应 `*-firmware` / `*-wo-firmware`。
+- **ImmortalWrt CR660x**：target 为 `cr6606`（非 `cr660x` 聚合名）。
+- setup 预装 feeds：`maccalc`、`wireless-regdb`、`iw`、`kmod-mt7615-firmware`、`kmod-mt7915-firmware`。
+- `scripts/ci-validate-device-packages.sh` 在 CI setup 阶段按平台校验上述规则。
+
+## 常见 Makefile WARNING（多数可忽略）
+
+| 包 | 用途 | 是否要管 |
+|----|------|----------|
+| `lldpd` → `libnetsnmp` | 二层邻居发现（LLDP），可选 SNMP 扩展 | **否**，与 WiFi 无关；未选 `lldpd` 时仅 metadata 扫描告警 |
+| `mt7615d` → `maccalc` | 斐讯 K2P 等 **MT7615 DBDC** 闭源 WiFi 驱动的 MAC 计算工具 | **是**（仅 `phicomm-k2p` 等启用 `kmod-mt7615d_dbdc` 时） |
+
+`maccalc` 在官方 `packages` feed 的 `net/maccalc`，setup 会 `feeds install maccalc`；设备 config 里 `CONFIG_PACKAGE_maccalc=y` 保证进固件。
+
 ## Actions Node 警告
 
 在 GitHub **Settings → Actions → Variables** 删除 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` 与 `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION`（非本仓库 workflow 定义）。

@@ -14,12 +14,12 @@
 |------|------|------|
 | 小米 AX3600 | `xiaomi-ax3600` | qualcommax / ipq807x |
 | 小米 AX9000 | `xiaomi-ax9000` | qualcommax / ipq807x |
-| 小米 WR30U | `xiaomi-wr30u` | mediatek / filogic mt7981 |
-| 小米 AX6000 | `xiaomi-ax6000` | mediatek / filogic mt7986 |
-| 红米 AX6000 | `redmi-ax6000` | mediatek / filogic mt7986 |
-| 斐讯 K2P | `phicomm-k2p` | ramips / mt7621 |
+| 小米 WR30U | `xiaomi-wr30u` | mediatek / filogic mt7981（ImmortalWrt 用 `*-stock` target） |
+| 小米 AX6000 | `xiaomi-ax6000` | mediatek / filogic mt7986（ImmortalWrt 用 `*-stock` target） |
+| 红米 AX6000 | `redmi-ax6000` | mediatek / filogic mt7986（ImmortalWrt 用 `*-stock` target） |
+| 斐讯 K2P | `phicomm-k2p` | ramips / mt7621（LEDE=lean MT7615 DBDC；ImmortalWrt=mt76） |
 | 小米路由 3G | `xiaomi-3g` | ramips / mt7621 |
-| 小米 CR660x | `xiaomi-cr660x` | ramips / mt7621 |
+| 小米 CR660x | `xiaomi-cr660x` | ramips / mt7621（ImmortalWrt 默认 **CR6606** 机型） |
 | NanoPi R2S | `r2s` | rockchip / armv8 |
 | x86_64 | `x86_64` | x86_64 / generic |
 | 树莓派 4B | `raspberrypi-4b` | bcm27xx / bcm2711 |

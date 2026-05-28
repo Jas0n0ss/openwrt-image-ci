@@ -33,6 +33,7 @@ else
 fi
 
 cat "${WORKSPACE}/configs/custom-plugins.config" >> .config
+cat "${WORKSPACE}/configs/snippets/wireless-core.config" >> .config
 cat "${WORKSPACE}/configs/snippets/dnsmasq-full.config" >> .config
 cat "${WORKSPACE}/configs/snippets/no-rust-passwall.config" >> .config
 cat "${WORKSPACE}/configs/snippets/no-selinux.config" >> .config

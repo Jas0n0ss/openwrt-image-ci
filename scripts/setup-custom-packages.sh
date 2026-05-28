@@ -81,6 +81,8 @@ done < <(find feeds -name '*fchomo*' -type d 2>/dev/null || true)
 
 echo "==> Installing base feed packages (optional failures ignored)"
 BASE_PACKAGES=(
+  maccalc wireless-regdb iw
+  kmod-mt7615-firmware kmod-mt7915-firmware
   pcre2 libpcre2 libpcre2-8 libxml2 libunistring
   libev libsodium c-ares libcurl libudns
   boost boost-system boost-program_options boost-date_time
