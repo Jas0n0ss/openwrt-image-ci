@@ -60,7 +60,15 @@
 | `CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_*=y` | 与 `kmod-nft-fullcone` 递归依赖 |
 | `CONFIG_PACKAGE_kmod-nft-fullcone=y` 等 | 应由 TurboACC 的 DEPENDS 拉取 |
 
-dnsmasq 使用 target 自带的 **DEFAULT_PACKAGES**（`dnsmasq`），不强行选 `dnsmasq-full`。TurboACC 只保留 `CONFIG_PACKAGE_luci-app-turboacc=y`。
+dnsmasq 使用 target 自带的 **DEFAULT_PACKAGES**（`dnsmasq`），不强行选 `dnsmasq-full`。
+
+**三层防 Kconfig 环（LEDE）：**
+
+1. `scripts/patch-src-kconfig.sh` — 删掉 dnsmasq 对 `nftables-json` 的 DEPENDS；TurboACC 子选项 `default n`
+2. `scripts/purge-broken-feed-packages.sh` — 全树删除重复的 `nftables-json` / `nftables-nojson` 目录
+3. `scripts/sanitize-config.sh` — `.config` 末尾强制 `# CONFIG_PACKAGE_… is not set`（含 TurboACC 全部 `INCLUDE_*`）
+
+在 `setup` 与 `ci-prepare-config` 都会执行 patch + purge。
 
 ## 缓存
 

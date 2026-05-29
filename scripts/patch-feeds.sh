@@ -53,7 +53,8 @@ strip_conflicting_feed_dirs() {
       [ -n "$dir" ] || continue
       rm -rf "$dir"
       echo "==> Removed conflicting feed package: ${dir}"
-    done < <(find feeds package/feeds -maxdepth 5 -type d -name "$name" 2>/dev/null || true)
+    done < <(find . -type d -name "$name" 2>/dev/null \
+      | grep -vE '^\./(dl|build_dir|staging_dir)/' || true)
   done
 }
 

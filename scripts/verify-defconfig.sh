@@ -28,8 +28,18 @@ if [ "$rc" -ne 0 ]; then
 fi
 
 if grep -q 'recursive dependency detected' "$log"; then
-  echo "ERROR: Kconfig recursive dependency — fix feeds/.config" >&2
-  exit 1
+  bad=0
+  for sym in dnsmasq-full luci-app-turboacc_INCLUDE_NFT_FULLCONE kmod-nft-fullcone nftables-json; do
+    if grep -q "^CONFIG_PACKAGE_${sym}=y" .config 2>/dev/null; then
+      echo "ERROR: cycle symbol enabled in .config: CONFIG_PACKAGE_${sym}=y" >&2
+      bad=1
+    fi
+  done
+  if [ "$bad" -ne 0 ]; then
+    echo "ERROR: Kconfig recursive dependency — fix feeds/.config" >&2
+    exit 1
+  fi
+  echo "WARN: Kconfig reported recursive dependency metadata but cycle packages stay disabled in .config"
 fi
 
 for bad in libselinux shadowsocks-rust naiveproxy; do

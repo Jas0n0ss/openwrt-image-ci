@@ -59,6 +59,8 @@ EOF
 
 ./scripts/feeds update -a
 
+bash "${SCRIPT_DIR}/patch-src-kconfig.sh" "$(pwd)"
+
 echo "==> Purging kenzo/small feeds (stale cache / Kconfig noise)"
 sed -i '\|kenzok8/openwrt-packages|d; \|kenzok8/small|d' feeds.conf.default 2>/dev/null || true
 rm -rf feeds/small feeds/kenzo package/feeds/small package/feeds/feeds/kenzo 2>/dev/null || true
@@ -124,6 +126,7 @@ if [ ! -d package/luci-app-turboacc ]; then
   cp -a "$TMPDIR/turboacc-luci/luci-app-turboacc" package/
   cp -a "$TMPDIR/turboacc-pkg/nft-fullcone" package/ 2>/dev/null || true
   verify_makefile package/luci-app-turboacc/Makefile "TurboACC"
+  bash "${SCRIPT_DIR}/patch-src-kconfig.sh" "$(pwd)"
   echo "    installed TurboACC"
 fi
 
