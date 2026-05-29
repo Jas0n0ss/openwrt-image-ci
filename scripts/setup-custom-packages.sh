@@ -20,7 +20,6 @@ append_feed_line() {
 
 install_pkg() {
   local pkg="$1"
-  # Custom clones live under package/ — not in feeds index
   if [ -f "package/${pkg}/Makefile" ]; then
     return 0
   fi
@@ -43,6 +42,9 @@ verify_makefile() {
   }
 }
 
+# Cached feeds may contain kenzo/small — scrub before any feeds update
+bash "${SCRIPT_DIR}/ci-fix-kconfig-tree.sh" "$(pwd)"
+
 echo "==> Appending PassWall feeds to feeds.conf.default"
 if [ ! -f feeds.conf.default ]; then
   echo "ERROR: feeds.conf.default not found in $(pwd)" >&2
@@ -59,22 +61,7 @@ EOF
 
 ./scripts/feeds update -a
 
-bash "${SCRIPT_DIR}/patch-src-kconfig.sh" "$(pwd)"
-
-echo "==> Purging kenzo/small feeds (stale cache / Kconfig noise)"
-sed -i '\|kenzok8/openwrt-packages|d; \|kenzok8/small|d' feeds.conf.default 2>/dev/null || true
-rm -rf feeds/small feeds/kenzo package/feeds/small package/feeds/feeds/kenzo 2>/dev/null || true
-rm -rf package/feeds/small package/feeds/kenzo 2>/dev/null || true
-while IFS= read -r dir; do
-  [ -n "$dir" ] || continue
-  rm -rf "$dir"
-  echo "==> Removed broken nftables feed dup: ${dir}"
-done < <(find feeds package/feeds -maxdepth 5 -type d \( -name nftables-json -o -name nftables-nojson \) 2>/dev/null || true)
-
 echo "==> Removing conflicting feed packages"
-if [ -d feeds/kenzo ]; then
-  rm -rf feeds/kenzo/luci-theme-alpha feeds/kenzo/luci-app-dockerman 2>/dev/null || true
-fi
 rm -rf feeds/luci/luci-app-dae feeds/luci/luci-app-daed 2>/dev/null || true
 while IFS= read -r dir; do
   [ -n "$dir" ] || continue
@@ -93,7 +80,6 @@ BASE_PACKAGES=(
   libpam zoneinfo-all
   luci-compat luci-proto-ipv6 luci-lua-runtime
   ttyd luci-app-ttyd libwebsockets-full libuv libjson-c libcap
-  kmod-nft-offload kmod-nft-fullcone kmod-tcp-bbr
   jsonfilter v2ray-geoip v2ray-geosite
   golang
 )
@@ -123,12 +109,10 @@ fi
 
 if [ ! -d package/luci-app-turboacc ]; then
   clone_repo "$TMPDIR/turboacc-luci" -b luci https://github.com/chenmozhijin/turboacc
-  clone_repo "$TMPDIR/turboacc-pkg" -b package https://github.com/chenmozhijin/turboacc
   cp -a "$TMPDIR/turboacc-luci/luci-app-turboacc" package/
-  cp -a "$TMPDIR/turboacc-pkg/nft-fullcone" package/ 2>/dev/null || true
+  # Do NOT copy package/nft-fullcone — duplicates kmod-nft-fullcone and causes Kconfig cycle with luci-app-turboacc
   verify_makefile package/luci-app-turboacc/Makefile "TurboACC"
-  bash "${SCRIPT_DIR}/patch-src-kconfig.sh" "$(pwd)"
-  echo "    installed TurboACC"
+  echo "    installed TurboACC (LuCI only)"
 fi
 
 if [ ! -d package/luci-theme-aurora ]; then
@@ -158,11 +142,13 @@ for cfg in "${CONFIG_FILES[@]}"; do
   [ -f "$cfg" ] || continue
   while IFS= read -r pkg; do
     [ -n "$pkg" ] || continue
+    case "$pkg" in
+      kmod-nft-fullcone|kmod-nft-offload|kmod-tcp-bbr|nftables-json|nftables-nojson) continue ;;
+    esac
     install_pkg "$pkg" || echo "    skip config package: ${pkg}"
   done < <("$EXTRACT_PKG" "$cfg")
 done
 
-# feeds install may refresh passwall tree — re-apply Go version pins
-bash "${SCRIPT_DIR}/patch-feeds.sh" "$(pwd)"
+bash "${SCRIPT_DIR}/ci-fix-kconfig-tree.sh" "$(pwd)"
 bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)" full
 echo "==> Custom package setup finished"

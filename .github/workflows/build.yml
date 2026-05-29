@@ -99,15 +99,19 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/dl
-          key: dl-${{ env.REPO }}-v8-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh', 'scripts/patch-src-kconfig.sh', 'scripts/sanitize-config.sh', 'scripts/ci-prepare-config.sh') }}
+          key: dl-${{ env.REPO }}-kconfig-fix-v1-${{ hashFiles('configs/**', 'scripts/ci-fix-kconfig-tree.sh', 'scripts/setup-custom-packages.sh', 'scripts/ci-prepare-config.sh') }}
           restore-keys: dl-${{ env.REPO }}-
 
       - name: Cache feeds
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-${{ env.REPO }}-v8-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh', 'scripts/patch-src-kconfig.sh', 'scripts/sanitize-config.sh', 'scripts/purge-broken-feed-packages.sh', 'scripts/ci-prepare-config.sh') }}
+          key: feeds-${{ env.REPO }}-kconfig-fix-v1-${{ hashFiles('configs/**', 'scripts/ci-fix-kconfig-tree.sh', 'scripts/setup-custom-packages.sh', 'scripts/purge-broken-feed-packages.sh', 'scripts/patch-src-kconfig.sh') }}
           restore-keys: feeds-${{ env.REPO }}-
+
+      - name: Scrub cached feeds before setup
+        working-directory: ${{ env.SRC_DIR }}
+        run: bash ${{ github.workspace }}/scripts/ci-fix-kconfig-tree.sh .
 
       - name: Cache ccache
         uses: actions/cache@v5

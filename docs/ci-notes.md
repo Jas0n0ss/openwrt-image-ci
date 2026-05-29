@@ -62,13 +62,17 @@
 
 dnsmasq 使用 target 自带的 **DEFAULT_PACKAGES**（`dnsmasq`），不强行选 `dnsmasq-full`。
 
-**三层防 Kconfig 环（LEDE）：**
+**一次性 Kconfig 修复（`scripts/ci-fix-kconfig-tree.sh`）：**
 
-1. `scripts/patch-src-kconfig.sh` — 删掉 dnsmasq→`nftables-json` DEPENDS；TurboACC Makefile 去掉 `kmod-nft-fullcone` / `kmod-nft-offload` 条件依赖行
-2. `scripts/purge-broken-feed-packages.sh` — 按 `PKG_NAME:=nftables-json` 删除重复包目录（不只靠文件夹名）
-3. `scripts/sanitize-config.sh` — `.config` 末尾强制 `# CONFIG_PACKAGE_… is not set`（含 TurboACC 全部 `INCLUDE_*`）
+1. 从 `feeds.conf*` 删除 kenzo/small，并 `rm -rf feeds/{kenzo,small}`
+2. 按 `PKG_NAME:=nftables-json` 删除重复包（修复自引用环）
+3. `patch-src-kconfig.sh` — dnsmasq 去掉 nftset→nftables-json；TurboACC 去掉 `kmod-nft-fullcone` 依赖行
+4. **不要** `feeds install kmod-nft-fullcone`，**不要** clone `package/nft-fullcone`（与 TurboACC 形成环）
+5. `sanitize-config.sh` — `.config` 守卫项
+6. Actions cache key：`feeds-*-kconfig-fix-v1-*`（旧 v8 缓存作废）
+7. workflow：cache 恢复后、setup 前后、`defconfig` 前各跑一次 `ci-fix-kconfig-tree.sh`
 
-在 `setup` 与 `ci-prepare-config` 都会执行 patch + purge。
+`verify-defconfig`：日志里出现任意 `recursive dependency detected` 即失败（不再 WARN 放过）。
 
 ## LuCI 简体中文
 

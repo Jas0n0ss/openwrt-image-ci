@@ -52,8 +52,7 @@ done
 echo "CONFIG_DEVEL=y" >> .config
 echo "CONFIG_CCACHE=y" >> .config
 
-bash "${SCRIPT_DIR}/purge-broken-feed-packages.sh" "$(pwd)"
-bash "${SCRIPT_DIR}/patch-src-kconfig.sh" "$(pwd)"
+bash "${SCRIPT_DIR}/ci-fix-kconfig-tree.sh" "$(pwd)"
 bash "${SCRIPT_DIR}/sanitize-config.sh" "$(pwd)"
 bash "${WORKSPACE}/scripts/verify-defconfig.sh" "$(pwd)"
 
