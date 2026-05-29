@@ -20,13 +20,16 @@ patch_turboacc_makefile() {
   local mk
   for mk in package/luci-app-turboacc/Makefile feeds/*/luci-app-turboacc/Makefile; do
     [ -f "$mk" ] || continue
+    # Remove conditional DEPENDS that create luci-app-turboacc <-> kmod-nft-fullcone cycle
+    sed -i '/kmod-nft-fullcone/d' "$mk"
+    sed -i '/kmod-nft-offload/d' "$mk"
     sed -i '/INCLUDE_NFT_FULLCONE/,/endef/{
       /default y/s/default y/default n/
     }' "$mk"
     sed -i '/INCLUDE_BBR_CCA/,/endef/{
       /default y/s/default y/default n/
     }' "$mk"
-    echo "==> patch-src-kconfig: TurboACC NFT_FULLCONE/BBR_CCA default n in ${mk}"
+    echo "==> patch-src-kconfig: TurboACC stripped nft kmod DEPENDS in ${mk}"
   done
 }
 
