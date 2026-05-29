@@ -10,10 +10,37 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd "$SRC_DIR"
 
+stash_turboacc() {
+  local action="$1" stash=".ci-stash-turboacc"
+  case "$action" in
+    hide)
+      mkdir -p "$stash"
+      for d in luci-app-turboacc nft-fullcone; do
+        if [ -d "package/${d}" ]; then
+          rm -rf "${stash}/${d}"
+          mv "package/${d}" "${stash}/${d}"
+          echo "==> verify-defconfig: stashed package/${d}"
+        fi
+      done
+      ;;
+    unhide)
+      for d in luci-app-turboacc nft-fullcone; do
+        if [ -d "${stash}/${d}" ]; then
+          rm -rf "package/${d}"
+          mv "${stash}/${d}" "package/${d}"
+          echo "==> verify-defconfig: restored package/${d}"
+        fi
+      done
+      ;;
+    *)
+      echo "ERROR: stash_turboacc unknown action '${action}'" >&2
+      exit 1
+      ;;
+  esac
+}
+
 bash "${SCRIPT_DIR}/ci-fix-kconfig-tree.sh" "$(pwd)"
-bash "${SCRIPT_DIR}/purge-turboacc-duplicates.sh" "$(pwd)"
-bash "${SCRIPT_DIR}/ci-turboacc-stash.sh" "$(pwd)" hide
-bash "${SCRIPT_DIR}/purge-turboacc-duplicates.sh" "$(pwd)"
+stash_turboacc hide
 
 [ -f .config ] || {
   echo "ERROR: .config missing in $SRC_DIR" >&2
@@ -25,7 +52,7 @@ restored_turboacc=0
 cleanup() {
   rm -f "$log"
   if [ "$restored_turboacc" -eq 0 ]; then
-    bash "${SCRIPT_DIR}/ci-turboacc-stash.sh" "$(pwd)" unhide >/dev/null 2>&1 || true
+    stash_turboacc unhide >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
@@ -48,10 +75,8 @@ if grep -q 'recursive dependency detected' "$log"; then
   exit 1
 fi
 
-bash "${SCRIPT_DIR}/ci-turboacc-stash.sh" "$(pwd)" unhide
+stash_turboacc unhide
 restored_turboacc=1
-bash "${SCRIPT_DIR}/purge-turboacc-duplicates.sh" "$(pwd)"
-bash "${SCRIPT_DIR}/patch-turboacc-packages.sh" "$(pwd)"
 bash "${SCRIPT_DIR}/ci-fix-kconfig-tree.sh" "$(pwd)"
 bash "${SCRIPT_DIR}/ci-enable-turboacc.sh" "$(pwd)" "$WORKSPACE"
 

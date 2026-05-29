@@ -10,8 +10,7 @@ CFG_SNIP="${WORKSPACE}/configs/snippets/turboacc.config"
 cd "$SRC_DIR"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-bash "${SCRIPT_DIR}/purge-turboacc-duplicates.sh" "$(pwd)"
-bash "${SCRIPT_DIR}/patch-turboacc-packages.sh" "$(pwd)"
+bash "${SCRIPT_DIR}/ci-fix-kconfig-tree.sh" "$(pwd)"
 
 [ -f "$CFG_SNIP" ] || {
   echo "ERROR: missing ${CFG_SNIP}" >&2
@@ -27,6 +26,22 @@ bash "${SCRIPT_DIR}/patch-turboacc-packages.sh" "$(pwd)"
   echo "ERROR: package/nft-fullcone missing — TurboACC kernel module not cloned" >&2
   exit 1
 }
+
+# Keep TurboACC options disabled by default; they are force-enabled below.
+if ! grep -q 'ci-patched-turboacc-defaults' package/luci-app-turboacc/Makefile; then
+  sed -i \
+    -e '/INCLUDE_OFFLOADING/,/^config /{
+      s/^[[:space:]]*default y if.*/	default n # ci-patched-turboacc-defaults/
+    }' \
+    -e '/INCLUDE_NFT_FULLCONE/,/^config /{
+      s/^[[:space:]]*default y[[:space:]]*$/	default n # ci-patched-turboacc-defaults/
+    }' \
+    -e '/INCLUDE_BBR_CCA/,/^config /{
+      s/^[[:space:]]*default y[[:space:]]*$/	default n # ci-patched-turboacc-defaults/
+    }' \
+    package/luci-app-turboacc/Makefile
+  echo "==> ci-enable-turboacc: patched default INCLUDE_* to n"
+fi
 
 [ -x ./scripts/config ] || {
   echo "ERROR: ./scripts/config not found in $(pwd)" >&2
