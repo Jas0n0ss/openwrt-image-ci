@@ -8,7 +8,7 @@ on:
         description: "源码树 (configs/<source>/)"
         type: choice
         required: true
-        default: immortalwrt
+        default: lede
         options:
           - immortalwrt
           - lede
