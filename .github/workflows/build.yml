@@ -16,7 +16,7 @@ on:
         description: "设备代号 (configs/devices.list)"
         type: choice
         required: true
-        default: all
+        default: xiaomi-cr660x
         options:
           - all
           - xiaomi-ax3600
