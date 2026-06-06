@@ -1,0 +1,186 @@
+name: Build LEDE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lede-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Shanghai
+  REPO: lede
+  UPSTREAM: coolsnowwolf/lede
+  SRC_DIR: src
+  CCACHE_DIR: ~/.ccache
+  CCACHE_COMPRESS: "true"
+  CCACHE_MAXSIZE: 10G
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        device:
+          - xiaomi-ax3600
+          - xiaomi-ax9000
+          - xiaomi-wr30u
+          - xiaomi-ax6000
+          - redmi-ax6000
+          - phicomm-k2p
+          - xiaomi-3g
+          - xiaomi-cr660x
+          - r2s
+          - x86_64
+          - raspberrypi-4b
+    name: lede · ${{ matrix.device }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.UPSTREAM }}
+          ref: master
+          path: ${{ env.SRC_DIR }}
+          fetch-depth: 1
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
+          sudo docker image prune -af || true
+
+      - name: Cache dl
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SRC_DIR }}/dl
+          key: dl-lede-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
+          restore-keys: dl-lede-
+
+      - name: Cache feeds
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SRC_DIR }}/feeds
+          key: feeds-lede-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
+          restore-keys: feeds-lede-
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ~/.ccache
+          key: ccache-lede-${{ matrix.device }}-${{ hashFiles('configs/lede/common.config', 'configs/custom-plugins.config') }}
+          restore-keys: ccache-lede-${{ matrix.device }}-
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential clang flex bison g++ gawk gettext \
+            git libssl-dev libelf-dev python3 python3-dev python3-distutils \
+            rsync unzip zlib1g-dev file wget subversion patch upx-ucl ccache \
+            ecj fastjar java-propose-classpath libncurses5-dev libncursesw5-dev \
+            libz-dev curl cmake jq rename tar
+
+      - name: Setup feeds and packages
+        working-directory: ${{ env.SRC_DIR }}
+        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh . append ${{ github.workspace }}/configs
+
+      - name: Prepare overlay
+        run: |
+          bash scripts/generate-banner.sh lede files
+          bash scripts/bundle-oh-my-bash.sh files
+          bash scripts/install-files-overlay.sh "${{ env.SRC_DIR }}" files
+
+      - name: Generate .config
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          set -euo pipefail
+          cat "${{ github.workspace }}/configs/lede/${{ matrix.device }}.config" > .config
+          cat "${{ github.workspace }}/configs/lede/common.config" >> .config
+          cat "${{ github.workspace }}/configs/custom-plugins.config" >> .config
+          for snip in \
+            "${{ github.workspace }}/configs/snippets/wireless-core.config" \
+            "${{ github.workspace }}/configs/snippets/luci-zh-cn.config" \
+            "${{ github.workspace }}/configs/snippets/no-rust-passwall.config" \
+            "${{ github.workspace }}/configs/snippets/no-selinux.config"; do
+            [ -f "$snip" ] && cat "$snip" >> .config
+          done
+          echo "CONFIG_DEVEL=y" >> .config
+          echo "CONFIG_CCACHE=y" >> .config
+          sed -i \
+            -e '/^CONFIG_PACKAGE_dnsmasq-full=y$/d' \
+            -e '/^CONFIG_PACKAGE_dnsmasq_full_/d' \
+            -e '/^CONFIG_PACKAGE_nftables-json=y$/d' \
+            -e '/^CONFIG_PACKAGE_nftables-nojson=y$/d' \
+            -e '/^CONFIG_PACKAGE_luci-app-turboacc/d' \
+            -e '/^CONFIG_PACKAGE_kmod-nft-fullcone=y$/d' \
+            -e '/^CONFIG_PACKAGE_kmod-tcp-bbr=y$/d' \
+            .config
+          {
+            echo "# CONFIG_PACKAGE_dnsmasq-full is not set"
+            echo "# CONFIG_PACKAGE_nftables-json is not set"
+            echo "# CONFIG_PACKAGE_nftables-nojson is not set"
+          } >> .config
+
+      - name: Defconfig and TurboACC
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          set -euo pipefail
+          STASH=".ci-stash-turboacc"
+          mkdir -p "$STASH"
+          for d in luci-app-turboacc nft-fullcone; do
+            [ -d "package/$d" ] && mv "package/$d" "$STASH/$d"
+          done
+          make defconfig > defconfig.log 2>&1 || { cat defconfig.log; exit 1; }
+          grep -q 'recursive dependency detected' defconfig.log && exit 1
+          for d in luci-app-turboacc nft-fullcone; do
+            [ -d "$STASH/$d" ] && mv "$STASH/$d" "package/$d"
+          done
+          cat "${{ github.workspace }}/configs/snippets/turboacc.config" >> .config
+          {
+            echo "CONFIG_PACKAGE_kmod-nft-fullcone=y"
+            echo "CONFIG_PACKAGE_kmod-tcp-bbr=y"
+            echo "CONFIG_PACKAGE_luci-app-turboacc=y"
+            echo "CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_BBR_CCA=y"
+            echo "CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_NFT_FULLCONE=y"
+            echo "# CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_OFFLOADING is not set"
+          } >> .config
+          make oldconfig > oldconfig.log 2>&1 || { cat oldconfig.log; exit 1; }
+          grep -q 'recursive dependency detected' oldconfig.log && exit 1
+
+      - name: Compile
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/ccache:$PATH"
+          make download -j8
+          make -j"$(nproc)" || make -j1 V=s
+
+      - name: Pack firmware
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          bash ${{ github.workspace }}/scripts/pack-firmware.sh \
+            "${{ matrix.device }}" lede \
+            "${{ github.workspace }}/configs/lede/${{ matrix.device }}.config" \
+            bin/targets "../release/${{ matrix.device }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: lede-${{ matrix.device }}
+          path: release/${{ matrix.device }}
+          retention-days: 7
+
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: lede-${{ matrix.device }}-${{ github.run_number }}
+          name: "LEDE ${{ matrix.device }} #${{ github.run_number }}"
+          files: release/${{ matrix.device }}/Jas0n0ss-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
