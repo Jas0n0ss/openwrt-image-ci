@@ -21,8 +21,11 @@ on:
           - r2s
           - x86_64
           - raspberrypi-4b
-  schedule:
-    - cron: "0 20 * * 0"
+  # 已关闭自动构建：优化配置后在 Actions 手动 Run workflow
+  # push:
+  #   branches: [main]
+  # schedule:
+  #   - cron: "0 20 * * 0"
 
 permissions:
   contents: write

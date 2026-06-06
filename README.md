@@ -31,14 +31,14 @@
 | Workflow | 说明 | 耗时 |
 |----------|------|------|
 | **Build LEDE** | 全量编译 11 台 LEDE | 数小时 |
-| **Build ImmortalWrt** | 全量编译 11 台 ImmortalWrt（每周日自动） | 数小时 |
+| **Build ImmortalWrt** | 全量编译 11 台 ImmortalWrt | 数小时 |
 | **Build ImmortalWrt (Fast)** | ImageBuilder 快速打包（类似 [固件选择器](https://firmware-selector.immortalwrt.org/)） | 约 30～60 分钟 |
 
 ```
 Actions → 选 workflow → Run workflow → device 选 all 或单台设备
 ```
 
-手动触发时可选择 **all**（11 台）或 **单台设备**（如 `r2s`）。定时任务默认 `all`。
+**仅手动触发**（push / 定时已关闭）。可选择 **all**（11 台）或 **单台设备**（如 `r2s`）。
 
 产物在 **Releases**（一次 build 全部 11 台固件在一个 Release 里）或 Artifacts 下载。
 

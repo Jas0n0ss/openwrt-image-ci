@@ -24,6 +24,9 @@ on:
           - r2s
           - x86_64
           - raspberrypi-4b
+  # 已关闭自动构建：优化配置后在 Actions 手动 Run workflow
+  # push:
+  #   branches: [main]
 
 permissions:
   contents: write
