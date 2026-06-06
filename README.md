@@ -37,7 +37,7 @@ Actions → Build LEDE → Run workflow
 Actions → Build ImmortalWrt → Run workflow
 ```
 
-产物在 Artifacts 下载。
+产物在 **Releases**（一次 build 全部 11 台固件在一个 Release 里）或 Artifacts 下载。
 
 ## 默认凭据
 

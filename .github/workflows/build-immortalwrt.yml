@@ -179,12 +179,31 @@ jobs:
           path: release/${{ matrix.device }}
           retention-days: 7
 
-      - name: Release
-        if: github.event_name == 'workflow_dispatch'
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all firmware
+        uses: actions/download-artifact@v5
+        with:
+          pattern: immortalwrt-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -type f -name 'Jas0n0ss-*' -exec cp -t release/ {} +
+          ls -la release/
+
+      - name: Create release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: immortalwrt-${{ matrix.device }}-${{ github.run_number }}
-          name: "ImmortalWrt ${{ matrix.device }} #${{ github.run_number }}"
-          files: release/${{ matrix.device }}/Jas0n0ss-*
+          tag_name: immortalwrt-${{ github.run_number }}
+          name: "ImmortalWrt Build #${{ github.run_number }}"
+          body: |
+            全部 11 台设备 ImmortalWrt 固件，一次下载。
+            命名：`Jas0n0ss-immortalwrt-<代号>-<设备>-<平台>-<类型>.<后缀>`
+          files: release/Jas0n0ss-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
