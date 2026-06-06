@@ -1,0 +1,27 @@
+# 每小时自动清理失败 / 已取消的 Actions 构建记录
+
+name: Cleanup Action Runs
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: cleanup-runs
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Delete failed and cancelled runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/cleanup-workflow-runs.sh "${{ github.repository }}"
