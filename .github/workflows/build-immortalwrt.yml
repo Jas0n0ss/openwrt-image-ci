@@ -172,6 +172,24 @@ jobs:
             "${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config" \
             bin/targets "../release/${{ matrix.device }}"
 
+      - name: Collect custom ipk for fast builds
+        run: |
+          bash scripts/collect-custom-ipk.sh \
+            "${{ env.SRC_DIR }}" \
+            "${{ github.workspace }}/configs" \
+            ipk-staging
+
+      - id: ipk-arch
+        run: |
+          arch=$(bash scripts/imagebuilder-arch.sh "configs/immortalwrt/${{ matrix.device }}.config")
+          echo "name=$arch" >> "$GITHUB_OUTPUT"
+
+      - name: Save custom ipk cache
+        uses: actions/cache/save@v4
+        with:
+          path: ipk-staging/${{ steps.ipk-arch.outputs.name }}
+          key: ipk-immortalwrt-${{ steps.ipk-arch.outputs.name }}-${{ github.run_id }}
+
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:

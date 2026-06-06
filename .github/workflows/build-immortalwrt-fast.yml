@@ -1,0 +1,105 @@
+# ImmortalWrt 快速构建 — 官方 ImageBuilder + 自定义 ipk（类似 firmware-selector）
+# 前提：先跑过一次 Build ImmortalWrt（全量）以生成并缓存自定义 ipk
+
+name: Build ImmortalWrt (Fast)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: immortalwrt-fast-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Shanghai
+  IB_BASE: https://downloads.immortalwrt.org/snapshots
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        device:
+          - xiaomi-ax3600
+          - xiaomi-ax9000
+          - xiaomi-wr30u
+          - xiaomi-ax6000
+          - redmi-ax6000
+          - phicomm-k2p
+          - xiaomi-3g
+          - xiaomi-cr660x
+          - r2s
+          - x86_64
+          - raspberrypi-4b
+    name: fast · ${{ matrix.device }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve arch
+        id: arch
+        run: |
+          arch=$(bash scripts/imagebuilder-arch.sh "configs/immortalwrt/${{ matrix.device }}.config")
+          echo "name=$arch" >> "$GITHUB_OUTPUT"
+
+      - name: Restore custom ipk cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ipk-cache/${{ steps.arch.outputs.name }}
+          key: ipk-immortalwrt-${{ steps.arch.outputs.name }}-${{ github.run_id }}
+          restore-keys: |
+            ipk-immortalwrt-${{ steps.arch.outputs.name }}-
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y zstd curl
+
+      - name: Build image
+        run: |
+          bash scripts/imagebuilder-build.sh \
+            "${{ matrix.device }}" \
+            "${{ github.workspace }}/configs" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/ipk-cache" \
+            "${{ github.workspace }}/release/${{ matrix.device }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: immortalwrt-fast-${{ matrix.device }}
+          path: release/${{ matrix.device }}
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all firmware
+        uses: actions/download-artifact@v5
+        with:
+          pattern: immortalwrt-fast-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -type f -name 'Jas0n0ss-*' -exec cp -t release/ {} +
+          ls -la release/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: immortalwrt-fast-${{ github.run_number }}
+          name: "ImmortalWrt Fast Build #${{ github.run_number }}"
+          body: |
+            ImageBuilder 快速构建，全部 11 台设备固件。
+            自定义插件来自最近一次全量编译缓存的 ipk。
+          files: release/Jas0n0ss-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

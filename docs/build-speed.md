@@ -25,6 +25,13 @@
 3. **大改配置后**：修改 `configs/custom-plugins.config` 或 `setup-custom-packages.sh` 会刷新 cache key，首次仍较慢属正常。
 4. **更快方案（需自备）**：自托管 Runner + 持久磁盘保留 `dl/`、`build_dir/`、`~/.ccache`。
 
-## 为何不采用 Image Builder
+## ImageBuilder 快速路径
 
-Image Builder 适合「在官方 SDK 上装现成 ipk」。本仓库需从源码编译自定义 feed 与 `package/` 下的插件，**无法去掉全量编译**，只能优化缓存。
+`build-immortalwrt-fast.yml` 使用官方 [ImageBuilder](https://downloads.immortalwrt.org/) + 全量编译缓存的自定义 `ipk`，单台约 3～8 分钟。
+
+**流程：**
+
+1. 先运行 **Build ImmortalWrt**（全量）→ 自动 `collect-custom-ipk.sh` 写入 Actions 缓存
+2. 再运行 **Build ImmortalWrt (Fast)** → 下载 IB、`make image`、打 overlay
+
+插件大改后需重新全量编译以刷新 ipk 缓存。

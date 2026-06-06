@@ -2,6 +2,7 @@
 
 [![Build LEDE](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-lede.yml?branch=main)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-lede.yml)
 [![Build ImmortalWrt](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-immortalwrt.yml?branch=main)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-immortalwrt.yml)
+[![Build ImmortalWrt Fast](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-immortalwrt-fast.yml?branch=main&label=immortalwrt-fast)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-immortalwrt-fast.yml)
 [![GitHub release](https://img.shields.io/github/v/release/Jas0n0ss/openwrt-lede-builder)](https://github.com/Jas0n0ss/openwrt-lede-builder/releases)
 [![License](https://img.shields.io/github/license/Jas0n0ss/openwrt-lede-builder)](https://github.com/Jas0n0ss/openwrt-lede-builder/blob/main/LICENSE)
 
@@ -27,13 +28,17 @@
 
 只有两个工作流，点 Run workflow 即可：
 
-| Workflow | 说明 |
-|----------|------|
-| **Build LEDE** | 编译全部 11 台 LEDE 固件 |
-| **Build ImmortalWrt** | 编译全部 11 台 ImmortalWrt 固件（每周日自动） |
+| Workflow | 说明 | 耗时 |
+|----------|------|------|
+| **Build LEDE** | 全量编译 11 台 LEDE | 数小时 |
+| **Build ImmortalWrt** | 全量编译 11 台 ImmortalWrt（每周日自动） | 数小时 |
+| **Build ImmortalWrt (Fast)** | ImageBuilder 快速打包（类似 [固件选择器](https://firmware-selector.immortalwrt.org/)） | 约 30～60 分钟 |
 
 ```
-Actions → Build LEDE → Run workflow
+# 日常快速出包（需先有一次全量编译缓存 ipk）
+Actions → Build ImmortalWrt (Fast) → Run workflow
+
+# 插件变更 / 首次 / 更新 ipk 缓存
 Actions → Build ImmortalWrt → Run workflow
 ```
 
