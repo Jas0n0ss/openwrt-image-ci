@@ -15,7 +15,7 @@
 | xray-core | 26.x (Go 1.26+) | 24.12.31 |
 | sing-box | 1.13.x (Go 1.24+) | 1.11.0 |
 
-由 [`scripts/patch-feeds.sh`](../scripts/patch-feeds.sh) 写入；[`scripts/verify-setup.sh`](../scripts/verify-setup.sh) 在 feeds 步骤末尾校验。
+由 `setup-custom-packages.sh` 内 `patch_feeds()` 写入，末尾 `verify_setup()` 校验。
 
 ## Kconfig 循环依赖
 
@@ -23,8 +23,8 @@
 
 ## 构建脚本链
 
-1. `setup-custom-packages.sh` → `patch-feeds.sh` → `verify-setup.sh`
-2. 生成 `.config`，并在 `build.yml` 内联执行 base `defconfig` + TurboACC 启用校验
+1. `setup-custom-packages.sh`（feeds + patch + 自定义包克隆 + 校验）
+2. workflow 内联合并 `.config`，内联 base `defconfig` + TurboACC 启用
 3. workflow 内联编译（失败会 `exit 1`，并行失败会 `-j1 V=s` 重试）
 4. `pack-firmware.sh`（无镜像则失败）
 
@@ -69,7 +69,7 @@ dnsmasq 使用 target 自带的 **DEFAULT_PACKAGES**（`dnsmasq`），不强行�
 3. dnsmasq 去掉 nftset→nftables-json；删除 feeds 里重复的 `kmod-nft-fullcone`（保留 `package/nft-fullcone`）
 4. TurboACC：**clone `luci-app-turboacc` + `nft-fullcone`**；workflow 在 base `make defconfig` 前暂存 TurboACC 包，defconfig 后恢复并启用。
 5. workflow 内联 sanitize — `.config` 守卫项（dnsmasq / nftables / 合并阶段 TurboACC）
-6. `patch-feeds.sh` **不得**删除 `feeds/luci/luci-ssl`（`common.config` 需要 `luci-ssl`）；仅清理 kenzo/small 里的重复 `luci-ssl`
+6. `patch_feeds()` **不得**删除 `feeds/luci/luci-ssl`；仅清理 kenzo/small 里的重复 `luci-ssl`
 7. Actions cache key：`feeds-*-kconfig-fix-v6-*` / `dl-*-kconfig-fix-v6-*`
 8. workflow：cache 恢复后、setup 后都执行内联 scrub
 
@@ -92,12 +92,11 @@ workflow 内联 defconfig 校验：日志里出现任意 `recursive dependency d
 
 ## CONFIG_PACKAGE 解析
 
-`setup-custom-packages.sh` 用 [`scripts/lib/extract-kconfig-packages.sh`](../scripts/lib/extract-kconfig-packages.sh) 从 config 提取包名，**排除** `*_INCLUDE_*` / `*_Including_*`（如 TurboACC 子选项、PassWall 组件开关），避免误执行 `feeds install`。config 驱动安装后仍会再跑 `patch-feeds.sh`。
+`setup-custom-packages.sh` 用 [`scripts/lib/extract-kconfig-packages.sh`](../scripts/lib/extract-kconfig-packages.sh) 从 config 提取包名，**排除** `*_INCLUDE_*` / `*_Including_*`；安装后执行 `patch_feeds()`。
 
 ## setup 校验
 
-- `verify-setup.sh feeds`：PassWall + xray/sing-box 版本 + `feeds/luci/luci-ssl`
-- `verify-setup.sh full`：MosDNS / TurboACC / Aurora / arpbind / `nft-fullcone` 的 `package/*/Makefile`
+`verify_setup()`：PassWall + xray/sing-box 版本 + `luci-ssl` + MosDNS / TurboACC / Aurora / arpbind / `nft-fullcone`
 - workflow setup 校验：禁止在 device/common/custom 中提前写 TurboACC / dnsmasq-full / nftables-json
 - 克隆失败立即 `exit 1`（不再静默继续）
 

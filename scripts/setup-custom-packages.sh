@@ -42,6 +42,101 @@ verify_makefile() {
   }
 }
 
+pin_pkg_makefile() {
+  local mk="$1" ver="$2" hash="$3" label="$4"
+  [ -f "$mk" ] || {
+    echo "ERROR: missing ${mk} (PassWall feed not installed?)" >&2
+    exit 1
+  }
+  if grep -q "PKG_VERSION:=${ver}" "$mk"; then
+    echo "==> ${label} already at ${ver}"
+    return 0
+  fi
+  sed -i \
+    -e "s/^PKG_VERSION:=.*/PKG_VERSION:=${ver}/" \
+    -e "s/^PKG_HASH:=.*/PKG_HASH:=${hash}/" \
+    "$mk"
+  echo "==> Pinned ${label} to ${ver} (golang/host 1.21 compatible)"
+}
+
+patch_feeds() {
+  pin_pkg_makefile \
+    "feeds/passwall_packages/xray-core/Makefile" \
+    "24.12.31" \
+    "e3c24b561ab422785ee8b7d4a15e44db159d9aa249eb29a36ad1519c15267be" \
+    "xray-core"
+  pin_pkg_makefile \
+    "feeds/passwall_packages/sing-box/Makefile" \
+    "1.11.0" \
+    "d4a48b2fe450041fea2d25955ddc092a62afc8da7bb442b49cb12575123b2edb" \
+    "sing-box"
+
+  local dir mk name feed
+  for dir in \
+    feeds/luci/applications/luci-app-passwall \
+    package/feeds/luci/luci-app-passwall; do
+    [ -e "$dir" ] || continue
+    rm -rf "$dir"
+    echo "==> Removed duplicate luci-app-passwall: ${dir}"
+  done
+
+  for mk in \
+    feeds/passwall_luci/luci-app-passwall/Makefile \
+    package/feeds/passwall_luci/luci-app-passwall/Makefile; do
+    [ -f "$mk" ] || continue
+    if grep -q '+dnsmasq-full' "$mk"; then
+      sed -i 's/+dnsmasq-full/+dnsmasq/g' "$mk"
+      echo "==> Patched ${mk}: dnsmasq-full -> dnsmasq"
+    fi
+  done
+
+  for name in luci-app-unblockneteasemusic nftables-json nftables-nojson; do
+    while IFS= read -r dir; do
+      [ -n "$dir" ] || continue
+      rm -rf "$dir"
+      echo "==> Removed conflicting feed package: ${dir}"
+    done < <(find feeds package/feeds package -type d -name "$name" 2>/dev/null || true)
+  done
+
+  for feed in feeds/kenzo feeds/small package/feeds/kenzo package/feeds/small; do
+    [ -d "$feed" ] || continue
+    while IFS= read -r dir; do
+      [ -n "$dir" ] || continue
+      rm -rf "$dir"
+      echo "==> Removed stale luci-ssl: ${dir}"
+    done < <(find "$feed" -type d -name luci-ssl 2>/dev/null || true)
+  done
+}
+
+verify_setup() {
+  [ -f feeds/passwall_packages/xray-core/Makefile ] \
+    || { echo "ERROR: missing passwall xray-core" >&2; exit 1; }
+  grep -q 'PKG_VERSION:=24.12.31' feeds/passwall_packages/xray-core/Makefile \
+    || { echo "ERROR: xray-core not pinned to 24.12.31" >&2; exit 1; }
+  [ -f feeds/passwall_packages/sing-box/Makefile ] \
+    || { echo "ERROR: missing sing-box" >&2; exit 1; }
+  grep -q 'PKG_VERSION:=1.11.0' feeds/passwall_packages/sing-box/Makefile \
+    || { echo "ERROR: sing-box not pinned to 1.11.0" >&2; exit 1; }
+  if [ ! -f feeds/passwall_luci/luci-app-passwall/Makefile ] \
+    && [ ! -f package/feeds/passwall_luci/luci-app-passwall/Makefile ]; then
+    echo "ERROR: luci-app-passwall not installed" >&2
+    exit 1
+  fi
+  if [ ! -f feeds/luci/luci-ssl/Makefile ] \
+    && [ ! -f package/feeds/luci/luci-ssl/Makefile ]; then
+    echo "ERROR: luci-ssl missing" >&2
+    exit 1
+  fi
+  for pkg in luci-app-mosdns luci-app-turboacc luci-theme-aurora luci-app-arpbind; do
+    [ -f "package/${pkg}/Makefile" ] || {
+      echo "ERROR: missing package/${pkg}/Makefile" >&2
+      exit 1
+    }
+  done
+  [ -f package/nft-fullcone/Makefile ] \
+    || { echo "ERROR: missing package/nft-fullcone" >&2; exit 1; }
+}
+
 echo "==> Appending PassWall feeds to feeds.conf.default"
 if [ ! -f feeds.conf.default ]; then
   echo "ERROR: feeds.conf.default not found in $(pwd)" >&2
@@ -103,8 +198,8 @@ for pkg in "${BASE_PACKAGES[@]}"; do
   install_pkg "$pkg" || echo "    skip optional feed package: ${pkg}"
 done
 
-bash "${SCRIPT_DIR}/patch-feeds.sh" "$(pwd)"
-bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)" feeds
+echo "==> Patching feeds (Go pins, Kconfig cycle fixes)"
+patch_feeds
 
 echo "==> Cloning custom packages into package/"
 mkdir -p package
@@ -166,14 +261,5 @@ for cfg in "${CONFIG_FILES[@]}"; do
   done < <("$EXTRACT_PKG" "$cfg")
 done
 
-bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)" full
-
-# TurboACC tree must be complete before image build
-for req in package/luci-app-turboacc/Makefile package/nft-fullcone/Makefile; do
-  [ -f "$req" ] || {
-    echo "ERROR: TurboACC incomplete: missing ${req}" >&2
-    exit 1
-  }
-done
-
+verify_setup
 echo "==> Custom package setup finished"

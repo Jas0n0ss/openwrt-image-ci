@@ -92,8 +92,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-immortalwrt-v2-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh') }}
-          restore-keys: feeds-immortalwrt-v2-
+          key: feeds-immortalwrt-v3-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
+          restore-keys: feeds-immortalwrt-v3-
 
       - name: Cache ccache
         uses: actions/cache@v5
@@ -153,7 +153,35 @@ jobs:
           } >> .config
 
       - name: Defconfig and TurboACC
-        run: bash ${{ github.workspace }}/scripts/defconfig-with-turboacc.sh ${{ github.workspace }}/configs ${{ env.SRC_DIR }}
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          set -euo pipefail
+          STASH=".ci-stash-turboacc"
+          mkdir -p "$STASH"
+          for d in luci-app-turboacc nft-fullcone; do
+            [ -d "package/$d" ] && mv "package/$d" "$STASH/$d"
+          done
+          make defconfig > defconfig.log 2>&1 || { echo "make defconfig failed:"; cat defconfig.log; exit 1; }
+          if grep -q 'recursive dependency detected' defconfig.log; then
+            echo "=== Kconfig recursive dependency (defconfig) ==="
+            grep -E 'recursive dependency|symbol PACKAGE_' defconfig.log || true
+            for sym in dnsmasq-full luci-app-turboacc kmod-nft-fullcone nftables-json nftables-nojson luci-ssl luci-app-unblockneteasemusic; do
+              if grep -q "^CONFIG_PACKAGE_${sym}=y" .config 2>/dev/null; then
+                echo "ERROR: cycle-prone package enabled: ${sym}"
+                exit 1
+              fi
+            done
+          fi
+          for d in luci-app-turboacc nft-fullcone; do
+            [ -d "$STASH/$d" ] && mv "$STASH/$d" "package/$d"
+          done
+          cat "${{ github.workspace }}/configs/snippets/turboacc.config" >> .config
+          make oldconfig > oldconfig.log 2>&1 || { echo "make oldconfig failed:"; cat oldconfig.log; exit 1; }
+          if grep -q 'recursive dependency detected' oldconfig.log; then
+            echo "=== Kconfig recursive dependency (oldconfig) ==="
+            grep -E 'recursive dependency|symbol PACKAGE_' oldconfig.log || true
+            exit 1
+          fi
 
       - name: Compile
         working-directory: ${{ env.SRC_DIR }}
