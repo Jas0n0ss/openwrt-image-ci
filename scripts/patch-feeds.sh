@@ -40,6 +40,17 @@ patch_passwall_go_packages() {
     "sing-box"
 }
 
+strip_luci_passwall_dupes() {
+  local dir
+  for dir in \
+    feeds/luci/applications/luci-app-passwall \
+    package/feeds/luci/luci-app-passwall; do
+    [ -e "$dir" ] || continue
+    rm -rf "$dir"
+    echo "==> Removed duplicate luci-app-passwall (use passwall_luci feed): ${dir}"
+  done
+}
+
 strip_conflicting_feed_dirs() {
   local names=(
     luci-app-unblockneteasemusic
@@ -70,5 +81,6 @@ strip_luci_ssl_dupes() {
 }
 
 patch_passwall_go_packages
+strip_luci_passwall_dupes
 strip_conflicting_feed_dirs
 strip_luci_ssl_dupes

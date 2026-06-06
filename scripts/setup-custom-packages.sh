@@ -60,10 +60,27 @@ EOF
 
 echo "==> Removing conflicting feed packages"
 rm -rf feeds/luci/luci-app-dae feeds/luci/luci-app-daed 2>/dev/null || true
+# LEDE luci feed ships luci-app-passwall (needs tuic-client); use passwall_luci only
+rm -rf feeds/luci/applications/luci-app-passwall package/feeds/luci/luci-app-passwall 2>/dev/null || true
 while IFS= read -r dir; do
   [ -n "$dir" ] || continue
   rm -rf "$dir"
 done < <(find feeds -name '*fchomo*' -type d 2>/dev/null || true)
+
+echo "==> Installing transitive feed dependencies"
+FEED_DEPS=(
+  wsdd2 luci-app-ksmbd luci-app-samba luci-app-samba4
+  ddns-scripts wget-ssl bash
+  ntpdate smartmontools gperf
+  libnetsnmp libtins libyaml-cpp libgpiod libtirpc libaio
+)
+for pkg in "${FEED_DEPS[@]}"; do
+  install_pkg "$pkg" || echo "    skip feed dep: ${pkg}"
+done
+
+echo "==> Installing PassWall feeds (required)"
+./scripts/feeds install -p passwall_packages
+./scripts/feeds install -p passwall_luci
 
 echo "==> Installing base feed packages (optional failures ignored)"
 BASE_PACKAGES=(
@@ -85,10 +102,6 @@ BASE_PACKAGES=(
 for pkg in "${BASE_PACKAGES[@]}"; do
   install_pkg "$pkg" || echo "    skip optional feed package: ${pkg}"
 done
-
-echo "==> Installing PassWall feeds (required)"
-./scripts/feeds install -p passwall_packages
-./scripts/feeds install -p passwall_luci
 
 bash "${SCRIPT_DIR}/patch-feeds.sh" "$(pwd)"
 bash "${SCRIPT_DIR}/verify-setup.sh" "$(pwd)" feeds
