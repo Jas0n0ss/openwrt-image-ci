@@ -35,12 +35,10 @@
 | **Build ImmortalWrt (Fast)** | ImageBuilder 快速打包（类似 [固件选择器](https://firmware-selector.immortalwrt.org/)） | 约 30～60 分钟 |
 
 ```
-# 日常快速出包（需先有一次全量编译缓存 ipk）
-Actions → Build ImmortalWrt (Fast) → Run workflow
-
-# 插件变更 / 首次 / 更新 ipk 缓存
-Actions → Build ImmortalWrt → Run workflow
+Actions → 选 workflow → Run workflow → device 选 all 或单台设备
 ```
+
+手动触发时可选择 **all**（11 台）或 **单台设备**（如 `r2s`）。定时任务默认 `all`。
 
 产物在 **Releases**（一次 build 全部 11 台固件在一个 Release 里）或 Artifacts 下载。
 

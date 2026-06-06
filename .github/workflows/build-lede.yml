@@ -2,6 +2,25 @@ name: Build LEDE
 
 on:
   workflow_dispatch:
+    inputs:
+      device:
+        description: "设备 (all = 全部 11 台)"
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - xiaomi-ax3600
+          - xiaomi-ax9000
+          - xiaomi-wr30u
+          - xiaomi-ax6000
+          - redmi-ax6000
+          - phicomm-k2p
+          - xiaomi-3g
+          - xiaomi-cr660x
+          - r2s
+          - x86_64
+          - raspberrypi-4b
 
 permissions:
   contents: write
@@ -20,25 +39,25 @@ env:
   CCACHE_MAXSIZE: 10G
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: resolve
+        run: |
+          matrix=$(bash scripts/resolve-device-matrix.sh "${{ github.event.inputs.device || 'all' }}")
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: setup
     runs-on: ubuntu-22.04
     timeout-minutes: 360
     strategy:
       fail-fast: false
       max-parallel: 3
-      matrix:
-        device:
-          - xiaomi-ax3600
-          - xiaomi-ax9000
-          - xiaomi-wr30u
-          - xiaomi-ax6000
-          - redmi-ax6000
-          - phicomm-k2p
-          - xiaomi-3g
-          - xiaomi-cr660x
-          - r2s
-          - x86_64
-          - raspberrypi-4b
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     name: lede · ${{ matrix.device }}
 
     steps:
