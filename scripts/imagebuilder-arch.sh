@@ -14,7 +14,8 @@ elif grep -q '^CONFIG_TARGET_qualcommax_ipq807x=y' "$CFG"; then
 elif grep -q '^CONFIG_TARGET_mediatek_filogic=y' "$CFG"; then
   echo aarch64_cortex-a53
 elif grep -q '^CONFIG_TARGET_ramips_mt7621=y' "$CFG"; then
-  echo mipsel_24kc
+  # ImmortalWrt master often uses mips_24kc; collect uses detect-build-arch for cache
+  echo mips_24kc
 elif grep -q '^CONFIG_TARGET_rockchip_armv8=y' "$CFG"; then
   echo aarch64_generic
 elif grep -q '^CONFIG_TARGET_bcm27xx_bcm2711=y' "$CFG"; then

@@ -18,6 +18,8 @@ CFG="$ROOT/immortalwrt/${DEVICE}.config"
 [ -f "$CFG" ] || { echo "ERROR: missing $CFG" >&2; exit 1; }
 
 ARCH="$("$SCRIPT_DIR/imagebuilder-arch.sh" "$CFG")"
+IPK_SRC="$("$SCRIPT_DIR/resolve-ipk-cache.sh" "$CFG" "$IPK_CACHE")"
+echo "    ipk cache: $IPK_SRC"
 PROFILE="$(grep -E '^CONFIG_TARGET_.*_DEVICE_.*=y' "$CFG" | head -1 | sed -E 's/^CONFIG_TARGET_.*_DEVICE_(.*)=y/\1/')"
 
 if grep -q '^CONFIG_TARGET_x86_64=y' "$CFG"; then
@@ -50,14 +52,8 @@ IB_DIR="$(find "$WORKDIR" -maxdepth 1 -type d -name 'immortalwrt-imagebuilder-*'
 [ -n "$IB_DIR" ] || { echo "ERROR: ImageBuilder extract failed" >&2; exit 1; }
 
 mkdir -p "$IB_DIR/packages"
-IPK_SRC="$IPK_CACHE/$ARCH"
-if [ -d "$IPK_SRC" ] && [ -n "$(ls -A "$IPK_SRC"/*.ipk 2>/dev/null)" ]; then
-  cp -a "$IPK_SRC"/*.ipk "$IB_DIR/packages/"
-  echo "==> Injected $(ls -1 "$IB_DIR/packages"/*.ipk | wc -l) custom ipk"
-else
-  echo "ERROR: missing custom ipk at $IPK_SRC — run Build ImmortalWrt (full) first" >&2
-  exit 1
-fi
+cp -a "$IPK_SRC"/*.ipk "$IB_DIR/packages/"
+echo "==> Injected $(find "$IB_DIR/packages" -maxdepth 1 -name '*.ipk' | wc -l) custom ipk"
 
 FILES_DIR="$WORKDIR/overlay"
 mkdir -p "$FILES_DIR"

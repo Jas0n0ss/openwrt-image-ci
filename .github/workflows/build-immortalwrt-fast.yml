@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: immortalwrt-fast-${{ github.ref_name }}
@@ -74,9 +75,58 @@ jobs:
           key: ipk-immortalwrt-${{ steps.arch.outputs.name }}-${{ github.run_id }}
           restore-keys: |
             ipk-immortalwrt-${{ steps.arch.outputs.name }}-
+            ipk-immortalwrt-mips_24kc-
+            ipk-immortalwrt-mipsel_24kc-
+            ipk-immortalwrt-aarch64_cortex-a53-
+            ipk-immortalwrt-aarch64_generic-
+            ipk-immortalwrt-aarch64_cortex-a72-
+            ipk-immortalwrt-x86_64-
+
+      - name: Check custom ipk
+        id: ipk-ready
+        run: |
+          if bash scripts/resolve-ipk-cache.sh \
+            "configs/immortalwrt/${{ matrix.device }}.config" ipk-cache >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download ipk from last full build
+        if: steps.ipk-ready.outputs.ready != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          arch="${{ steps.arch.outputs.name }}"
+          mkdir -p "ipk-cache/$arch"
+          names=(
+            "immortalwrt-ipk-${arch}"
+            immortalwrt-ipk-mips_24kc
+            immortalwrt-ipk-mipsel_24kc
+            immortalwrt-ipk-aarch64_cortex-a53
+            immortalwrt-ipk-aarch64_generic
+            immortalwrt-ipk-aarch64_cortex-a72
+            immortalwrt-ipk-x86_64
+          )
+          while IFS= read -r run_id; do
+            [ -n "$run_id" ] || continue
+            for name in "${names[@]}"; do
+              rm -rf "ipk-cache/$arch"/*
+              if gh run download "$run_id" -R "${{ github.repository }}" -n "$name" -D "ipk-cache/$arch" 2>/dev/null \
+                && [ -n "$(find "ipk-cache/$arch" -name '*.ipk' -print -quit)" ]; then
+                echo "Downloaded $name from full build run $run_id"
+                exit 0
+              fi
+            done
+          done < <(gh run list --repo "${{ github.repository }}" \
+            --workflow=build-immortalwrt.yml --status=success --limit=30 \
+            --json databaseId -q '.[].databaseId')
+          echo "ERROR: no ipk artifact found — run Build ImmortalWrt (full) for this arch first" >&2
+          exit 1
 
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y zstd curl
+        run: sudo apt-get update && sudo apt-get install -y zstd curl gh
 
       - name: Build image
         run: |

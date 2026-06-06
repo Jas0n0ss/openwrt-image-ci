@@ -198,17 +198,23 @@ jobs:
             "${{ env.SRC_DIR }}" \
             "${{ github.workspace }}/configs" \
             ipk-staging
-
-      - id: ipk-arch
-        run: |
-          arch=$(bash scripts/imagebuilder-arch.sh "configs/immortalwrt/${{ matrix.device }}.config")
-          echo "name=$arch" >> "$GITHUB_OUTPUT"
+          arch=$(bash scripts/detect-build-arch.sh "${{ env.SRC_DIR }}")
+          echo "arch=$arch" >> "$GITHUB_ENV"
+          echo "Collected ipk for arch: $arch"
 
       - name: Save custom ipk cache
         uses: actions/cache/save@v4
         with:
-          path: ipk-staging/${{ steps.ipk-arch.outputs.name }}
-          key: ipk-immortalwrt-${{ steps.ipk-arch.outputs.name }}-${{ github.run_id }}
+          path: ipk-staging/${{ env.arch }}
+          key: ipk-immortalwrt-${{ env.arch }}-${{ github.run_id }}
+
+      - name: Upload ipk artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: immortalwrt-ipk-${{ env.arch }}
+          path: ipk-staging/${{ env.arch }}
+          retention-days: 30
+          if-no-files-found: error
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5

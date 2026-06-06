@@ -7,7 +7,8 @@ set -euo pipefail
 SRC="${1:?src dir}"
 ROOT="${2:?config root}"
 OUT="${3:?output dir}"
-EXTRACT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/extract-kconfig-packages.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXTRACT="$SCRIPT_DIR/lib/extract-kconfig-packages.sh"
 
 FILES=(
   "$ROOT/immortalwrt/common.config"
@@ -15,29 +16,45 @@ FILES=(
   "$ROOT/snippets/turboacc.config"
 )
 
+ARCH="$("$SCRIPT_DIR/detect-build-arch.sh" "$SRC")"
+arch_dir="$SRC/bin/packages/$ARCH/packages"
+
+[ -d "$arch_dir" ] || {
+  echo "ERROR: missing $arch_dir" >&2
+  exit 1
+}
+
 mapfile -t PKGS < <("$EXTRACT" "${FILES[@]}" | sort -u)
 
-mkdir -p "$OUT"
+dest="$OUT/$ARCH"
+mkdir -p "$dest"
 found=0
 
-for arch_dir in "$SRC"/bin/packages/*/packages; do
-  [ -d "$arch_dir" ] || continue
-  arch="$(basename "$(dirname "$arch_dir")")"
-  dest="$OUT/$arch"
-  mkdir -p "$dest"
-
-  for pkg in "${PKGS[@]}"; do
-    for ipk in "$arch_dir"/${pkg}[_-]*.ipk "$arch_dir"/${pkg}.ipk; do
-      [ -f "$ipk" ] || continue
-      cp -a "$ipk" "$dest/"
-      found=1
-      echo "  $arch: $(basename "$ipk")"
-    done
+for pkg in "${PKGS[@]}"; do
+  shopt -s nullglob
+  for ipk in "$arch_dir"/${pkg}*.ipk; do
+    cp -a "$ipk" "$dest/"
+    found=1
+    echo "  $ARCH: $(basename "$ipk")"
   done
+  shopt -u nullglob
+done
+
+# PassWall / custom feed packages often use different prefixes — copy known patterns
+for pattern in luci-app-passwall passwall hysteria mosdns v2dat turboacc nft-fullcone \
+  luci-theme-aurora luci-app-arpbind xray-core sing-box; do
+  shopt -s nullglob
+  for ipk in "$arch_dir"/${pattern}*.ipk; do
+    cp -a "$ipk" "$dest/"
+    found=1
+    echo "  $ARCH: $(basename "$ipk") (pattern)"
+  done
+  shopt -u nullglob
 done
 
 if [ "$found" -eq 0 ]; then
-  echo "WARNING: no custom ipk collected (run full build first)" >&2
+  echo "ERROR: no custom ipk collected from $arch_dir" >&2
+  exit 1
 fi
 
-echo "==> ipk saved under $OUT"
+echo "==> ipk saved: $dest ($(find "$dest" -name '*.ipk' | wc -l) files)"

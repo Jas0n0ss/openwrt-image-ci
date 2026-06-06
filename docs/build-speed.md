@@ -31,7 +31,7 @@
 
 **流程：**
 
-1. 先运行 **Build ImmortalWrt**（全量）→ 自动 `collect-custom-ipk.sh` 写入 Actions 缓存
-2. 再运行 **Build ImmortalWrt (Fast)** → 下载 IB、`make image`、打 overlay
+1. 先运行 **Build ImmortalWrt**（全量）→ 收集真实架构目录下的 ipk，写入缓存并上传 `immortalwrt-ipk-<arch>` 构件
+2. 再运行 **Build ImmortalWrt (Fast)** → 恢复缓存；若无缓存则从最近一次全量构建下载 ipk
 
-插件大改后需重新全量编译以刷新 ipk 缓存。
+单台快速构建前，需至少对该**架构**跑过一次全量（如 `phicomm-k2p` 需 `mips_24kc` 的 ipk）。插件大改后需重新全量编译。
