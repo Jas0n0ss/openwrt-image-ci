@@ -51,6 +51,19 @@ strip_luci_passwall_dupes() {
   done
 }
 
+patch_passwall_dnsmasq() {
+  local mk
+  for mk in \
+    feeds/passwall_luci/luci-app-passwall/Makefile \
+    package/feeds/passwall_luci/luci-app-passwall/Makefile; do
+    [ -f "$mk" ] || continue
+    if grep -q '+dnsmasq-full' "$mk"; then
+      sed -i 's/+dnsmasq-full/+dnsmasq/g' "$mk"
+      echo "==> Patched ${mk}: dnsmasq-full -> dnsmasq (avoid LEDE Kconfig cycle)"
+    fi
+  done
+}
+
 strip_conflicting_feed_dirs() {
   local names=(
     luci-app-unblockneteasemusic
@@ -63,7 +76,7 @@ strip_conflicting_feed_dirs() {
       [ -n "$dir" ] || continue
       rm -rf "$dir"
       echo "==> Removed conflicting feed package: ${dir}"
-    done < <(find feeds package/feeds -type d -name "$name" 2>/dev/null || true)
+    done < <(find feeds package/feeds package -type d -name "$name" 2>/dev/null || true)
   done
 }
 
@@ -82,5 +95,6 @@ strip_luci_ssl_dupes() {
 
 patch_passwall_go_packages
 strip_luci_passwall_dupes
+patch_passwall_dnsmasq
 strip_conflicting_feed_dirs
 strip_luci_ssl_dupes

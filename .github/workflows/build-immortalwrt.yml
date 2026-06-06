@@ -92,8 +92,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-immortalwrt-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
-          restore-keys: feeds-immortalwrt-
+          key: feeds-immortalwrt-v2-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', 'scripts/patch-feeds.sh') }}
+          restore-keys: feeds-immortalwrt-v2-
 
       - name: Cache ccache
         uses: actions/cache@v5
@@ -153,30 +153,7 @@ jobs:
           } >> .config
 
       - name: Defconfig and TurboACC
-        working-directory: ${{ env.SRC_DIR }}
-        run: |
-          set -euo pipefail
-          STASH=".ci-stash-turboacc"
-          mkdir -p "$STASH"
-          for d in luci-app-turboacc nft-fullcone; do
-            [ -d "package/$d" ] && mv "package/$d" "$STASH/$d"
-          done
-          make defconfig > defconfig.log 2>&1 || { cat defconfig.log; exit 1; }
-          grep -q 'recursive dependency detected' defconfig.log && exit 1
-          for d in luci-app-turboacc nft-fullcone; do
-            [ -d "$STASH/$d" ] && mv "$STASH/$d" "package/$d"
-          done
-          cat "${{ github.workspace }}/configs/snippets/turboacc.config" >> .config
-          {
-            echo "CONFIG_PACKAGE_kmod-nft-fullcone=y"
-            echo "CONFIG_PACKAGE_kmod-tcp-bbr=y"
-            echo "CONFIG_PACKAGE_luci-app-turboacc=y"
-            echo "CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_BBR_CCA=y"
-            echo "CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_NFT_FULLCONE=y"
-            echo "# CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_OFFLOADING is not set"
-          } >> .config
-          make oldconfig > oldconfig.log 2>&1 || { cat oldconfig.log; exit 1; }
-          grep -q 'recursive dependency detected' oldconfig.log && exit 1
+        run: bash ${{ github.workspace }}/scripts/defconfig-with-turboacc.sh ${{ github.workspace }}/configs ${{ env.SRC_DIR }}
 
       - name: Compile
         working-directory: ${{ env.SRC_DIR }}
