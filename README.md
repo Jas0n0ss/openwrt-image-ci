@@ -25,10 +25,11 @@
 
 ## CI
 
-只有两个工作流，点 Run workflow 即可：
+编译环境使用 GHCR 预构建镜像 `ghcr.io/<owner>/<repo>/builder:22.04`（见 `docker/`），省去每次 `apt install`。首次推送 `docker/` 后先跑 **Build builder Docker image**，再跑固件构建。
 
 | Workflow | 说明 | 耗时 |
 |----------|------|------|
+| **Build builder Docker image** | 发布编译环境镜像到 GHCR | 约 5 分钟 |
 | **Build LEDE** | 全量编译 10 台 LEDE | 数小时 |
 | **Build ImmortalWrt** | 全量编译 10 台 ImmortalWrt | 数小时 |
 | **Build ImmortalWrt (Fast)** | ImageBuilder 快速打包（类似 [固件选择器](https://firmware-selector.immortalwrt.org/)） | 约 30～60 分钟 |
