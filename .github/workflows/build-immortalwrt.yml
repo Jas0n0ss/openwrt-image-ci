@@ -52,9 +52,18 @@ jobs:
       - uses: actions/checkout@v5
       - id: resolve
         run: |
+          set -euo pipefail
           DEVICE="${{ github.event.inputs.device || 'all' }}"
-          matrix=$(bash scripts/resolve-device-matrix.sh "$DEVICE")
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          mapfile -t ALL_DEVICES < <(sed 's/#.*//' configs/devices.list | xargs -n1 | grep -v '^$')
+          if [ "$DEVICE" = "all" ] || [ -z "$DEVICE" ]; then
+            json=$(printf '"%s",' "${ALL_DEVICES[@]}" | sed 's/,$//')
+            echo "matrix={\"device\":[${json}]}" >> "$GITHUB_OUTPUT"
+          else
+            for d in "${ALL_DEVICES[@]}"; do
+              [ "$d" = "$DEVICE" ] && { echo "matrix={\"device\":[\"${DEVICE}\"]}" >> "$GITHUB_OUTPUT"; exit 0; }
+            done
+            echo "ERROR: unknown device '$DEVICE'" >&2; exit 1
+          fi
 
   build:
     needs: setup
@@ -195,20 +204,49 @@ jobs:
       - name: Pack firmware
         working-directory: ${{ env.SRC_DIR }}
         run: |
-          bash ${{ github.workspace }}/scripts/pack-firmware.sh \
+          bash ${{ github.workspace }}/.github/ci/pack-firmware.sh \
             "${{ matrix.device }}" immortalwrt \
             "${{ github.workspace }}/configs/immortalwrt/${{ matrix.device }}.config" \
             bin/targets "../release/${{ matrix.device }}"
 
       - name: Collect custom ipk for fast builds
+        working-directory: ${{ env.SRC_DIR }}
         run: |
-          bash scripts/collect-custom-ipk.sh \
-            "${{ env.SRC_DIR }}" \
-            "${{ github.workspace }}/configs" \
-            ipk-staging
-          arch=$(bash scripts/detect-build-arch.sh "${{ env.SRC_DIR }}")
-          echo "arch=$arch" >> "$GITHUB_ENV"
-          echo "Collected ipk for arch: $arch"
+          set -euo pipefail
+          ROOT="${{ github.workspace }}/configs"
+          PKG_ROOT="bin/packages"
+          [ -d "$PKG_ROOT" ] || { echo "ERROR: $PKG_ROOT not found" >&2; exit 1; }
+          mapfile -t arches < <(find "$PKG_ROOT" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort -u)
+          [ "${#arches[@]}" -gt 0 ] || { echo "ERROR: no arch under $PKG_ROOT" >&2; exit 1; }
+          ARCH="${arches[0]}"
+          arch_dir="$PKG_ROOT/$ARCH/packages"
+          [ -d "$arch_dir" ] || { echo "ERROR: missing $arch_dir" >&2; exit 1; }
+          dest="../ipk-staging/$ARCH"
+          mkdir -p "$dest"
+          found=0
+          extract_pkgs() {
+            local cfg
+            for cfg in "$@"; do
+              [ -f "$cfg" ] || continue
+              grep -E '^CONFIG_PACKAGE_[A-Za-z0-9][A-Za-z0-9._+-]*=y' "$cfg" \
+                | sed 's/^CONFIG_PACKAGE_//;s/=y$//' | grep -vE '_INCLUDE_|_Including_' || true
+            done
+          }
+          while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            shopt -s nullglob
+            for ipk in "$arch_dir"/${pkg}*.ipk; do cp -a "$ipk" "$dest/"; found=1; done
+            shopt -u nullglob
+          done < <(extract_pkgs "$ROOT/immortalwrt/common.config" "$ROOT/custom-plugins.config" "$ROOT/snippets/turboacc.config" | sort -u)
+          for pattern in luci-app-passwall passwall hysteria mosdns v2dat turboacc nft-fullcone \
+            luci-theme-aurora luci-app-arpbind xray-core sing-box; do
+            shopt -s nullglob
+            for ipk in "$arch_dir"/${pattern}*.ipk; do cp -a "$ipk" "$dest/"; found=1; done
+            shopt -u nullglob
+          done
+          [ "$found" -eq 1 ] || { echo "ERROR: no custom ipk in $arch_dir" >&2; exit 1; }
+          echo "arch=$ARCH" >> "$GITHUB_ENV"
+          echo "Collected ipk for $ARCH: $(find "$dest" -name '*.ipk' | wc -l) files"
 
       - name: Save custom ipk cache
         uses: actions/cache/save@v4

@@ -2,7 +2,7 @@
 
 唯一工作流：`.github/workflows/build.yml`（`build-lede.yml` / `build-immortalwrt.yml` 已移除）。
 
-构建与修复逻辑已尽量内联到 `build.yml`；`scripts/` 仅保留通用构建与自定义内容相关脚本。
+CI 逻辑在 `.github/workflows/` 与 `.github/ci/`；`scripts/` 仅保留自定义固件内容（feeds/插件/overlay）。
 
 ## Feeds（LEDE）
 
@@ -92,7 +92,7 @@ workflow 内联 defconfig 校验：日志里出现任意 `recursive dependency d
 
 ## CONFIG_PACKAGE 解析
 
-`setup-custom-packages.sh` 用 [`scripts/lib/extract-kconfig-packages.sh`](../scripts/lib/extract-kconfig-packages.sh) 从 config 提取包名，**排除** `*_INCLUDE_*` / `*_Including_*`；安装后执行 `patch_feeds()`。
+`setup-custom-packages.sh` 内联 `extract_kconfig_packages()`，**排除** `*_INCLUDE_*` / `*_Including_*`；安装后执行 `patch_feeds()`。
 
 ## setup 校验
 

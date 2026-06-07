@@ -7,9 +7,18 @@ set -euo pipefail
 SRC_DIR="${1:?source directory required}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_ROOT="${3:-${SCRIPT_DIR}/../configs}"
-EXTRACT_PKG="${SCRIPT_DIR}/lib/extract-kconfig-packages.sh"
 
 cd "$SRC_DIR"
+
+extract_kconfig_packages() {
+  local cfg
+  for cfg in "$@"; do
+    [ -f "$cfg" ] || continue
+    grep -E '^CONFIG_PACKAGE_[A-Za-z0-9][A-Za-z0-9._+-]*=y' "$cfg" \
+      | sed 's/^CONFIG_PACKAGE_//;s/=y$//' \
+      | grep -vE '_INCLUDE_|_Including_' || true
+  done
+}
 
 append_feed_line() {
   local line="$1"
@@ -258,7 +267,7 @@ for cfg in "${CONFIG_FILES[@]}"; do
       luci-app-turboacc|kmod-nft-fullcone|kmod-nft-offload) continue ;;
     esac
     install_pkg "$pkg" || echo "    skip config package: ${pkg}"
-  done < <("$EXTRACT_PKG" "$cfg")
+  done < <(extract_kconfig_packages "$cfg")
 done
 
 verify_setup

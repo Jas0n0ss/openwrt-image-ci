@@ -49,8 +49,18 @@ jobs:
       - uses: actions/checkout@v5
       - id: resolve
         run: |
-          matrix=$(bash scripts/resolve-device-matrix.sh "${{ github.event.inputs.device || 'all' }}")
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          DEVICE="${{ github.event.inputs.device || 'all' }}"
+          mapfile -t ALL_DEVICES < <(sed 's/#.*//' configs/devices.list | xargs -n1 | grep -v '^$')
+          if [ "$DEVICE" = "all" ] || [ -z "$DEVICE" ]; then
+            json=$(printf '"%s",' "${ALL_DEVICES[@]}" | sed 's/,$//')
+            echo "matrix={\"device\":[${json}]}" >> "$GITHUB_OUTPUT"
+          else
+            for d in "${ALL_DEVICES[@]}"; do
+              [ "$d" = "$DEVICE" ] && { echo "matrix={\"device\":[\"${DEVICE}\"]}" >> "$GITHUB_OUTPUT"; exit 0; }
+            done
+            echo "ERROR: unknown device '$DEVICE'" >&2; exit 1
+          fi
 
   build:
     needs: setup
@@ -68,7 +78,15 @@ jobs:
       - name: Resolve arch
         id: arch
         run: |
-          arch=$(bash scripts/imagebuilder-arch.sh "configs/immortalwrt/${{ matrix.device }}.config")
+          set -euo pipefail
+          CFG="configs/immortalwrt/${{ matrix.device }}.config"
+          if grep -q '^CONFIG_TARGET_x86_64=y' "$CFG"; then arch=x86_64
+          elif grep -q '^CONFIG_TARGET_qualcommax_ipq807x=y' "$CFG"; then arch=aarch64_cortex-a53
+          elif grep -q '^CONFIG_TARGET_mediatek_filogic=y' "$CFG"; then arch=aarch64_cortex-a53
+          elif grep -q '^CONFIG_TARGET_ramips_mt7621=y' "$CFG"; then arch=mips_24kc
+          elif grep -q '^CONFIG_TARGET_rockchip_armv8=y' "$CFG"; then arch=aarch64_generic
+          elif grep -q '^CONFIG_TARGET_bcm27xx_bcm2711=y' "$CFG"; then arch=aarch64_cortex-a72
+          else echo "ERROR: unknown target in $CFG" >&2; exit 1; fi
           echo "name=$arch" >> "$GITHUB_OUTPUT"
 
       - name: Restore custom ipk cache
@@ -88,10 +106,16 @@ jobs:
       - name: Check custom ipk
         id: ipk-ready
         run: |
-          if bash scripts/resolve-ipk-cache.sh \
-            "configs/immortalwrt/${{ matrix.device }}.config" ipk-cache >/dev/null 2>&1; then
+          set -euo pipefail
+          arch="${{ steps.arch.outputs.name }}"
+          cache="ipk-cache"
+          try_dir() { [ -d "$1" ] && [ -n "$(find "$1" -maxdepth 1 -name '*.ipk' -print -quit 2>/dev/null)" ]; }
+          if try_dir "$cache" || try_dir "$cache/$arch"; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
+            for alt in mips_24kc mipsel_24kc aarch64_cortex-a53 aarch64_generic aarch64_cortex-a72 x86_64; do
+              try_dir "$cache/$alt" && { echo "ready=true" >> "$GITHUB_OUTPUT"; exit 0; }
+            done
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -133,7 +157,7 @@ jobs:
 
       - name: Build image
         run: |
-          bash scripts/imagebuilder-build.sh \
+          bash .github/ci/imagebuilder-build.sh \
             "${{ matrix.device }}" \
             "${{ github.workspace }}/configs" \
             "${{ github.workspace }}" \

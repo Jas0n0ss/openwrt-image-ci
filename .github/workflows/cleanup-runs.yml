@@ -1,10 +1,10 @@
-# 每小时自动清理失败 / 已取消的 Actions 构建记录
+# 每天自动清理失败 / 已取消的 Actions 构建记录（北京时间 0:00）
 
 name: Cleanup Action Runs
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 16 * * *"
   workflow_dispatch:
 
 permissions:
@@ -19,9 +19,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
-
       - name: Delete failed and cancelled runs
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/cleanup-workflow-runs.sh "${{ github.repository }}"
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          for status in failure cancelled; do
+            total=0
+            while true; do
+              mapfile -t ids < <(gh run list --repo "$REPO" --status "$status" --limit 100 \
+                --json databaseId -q '.[].databaseId')
+              [ "${#ids[@]}" -eq 0 ] && break
+              for id in "${ids[@]}"; do
+                [ -n "$id" ] && gh run delete "$id" --repo "$REPO" 2>/dev/null && total=$((total + 1)) || true
+              done
+            done
+            echo "==> $status: deleted $total run(s)"
+          done
