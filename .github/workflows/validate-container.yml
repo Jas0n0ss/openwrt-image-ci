@@ -29,6 +29,9 @@ jobs:
   validate:
     needs: setup
     runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
     container:
       image: ${{ needs.setup.outputs.builder_image }}
       credentials:
