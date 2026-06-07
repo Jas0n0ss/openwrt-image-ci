@@ -71,6 +71,41 @@ pin_pkg_makefile() {
   echo "==> Pinned ${label} to ${ver} (golang/host 1.21 compatible)"
 }
 
+remove_tree_named() {
+  local name="$1"
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    case "$dir" in
+      package/nft-fullcone|package/luci-app-turboacc) continue ;;
+    esac
+    rm -rf "$dir"
+    echo "==> Removed ${name}: ${dir}"
+  done < <(find feeds package/feeds package -type d -name "$name" 2>/dev/null || true)
+}
+
+patch_dnsmasq_makefile() {
+  local mk="package/network/services/dnsmasq/Makefile"
+  [ -f "$mk" ] || return 0
+  if grep -q 'dnsmasq_full_nftset:nftables-json' "$mk"; then
+    sed -i 's/[[:space:]]*+PACKAGE_dnsmasq_full_nftset:nftables-json//' "$mk"
+    echo "==> Patched ${mk}: removed nftset→nftables-json dep"
+  fi
+}
+
+patch_turboacc_makefile() {
+  local mk="package/luci-app-turboacc/Makefile"
+  [ -f "$mk" ] || return 0
+  if grep -q 'PACKAGE_\$(PKG_NAME)_INCLUDE_NFT_FULLCONE:kmod-nft-fullcone' "$mk"; then
+    sed -i \
+      -e 's/+PACKAGE_\$(PKG_NAME)_INCLUDE_BBR_CCA:kmod-tcp-bbr/+kmod-tcp-bbr/' \
+      -e 's/+PACKAGE_\$(PKG_NAME)_INCLUDE_NFT_FULLCONE:kmod-nft-fullcone/+kmod-nft-fullcone/' \
+      -e '/+PACKAGE_\$(PKG_NAME)_INCLUDE_OFFLOADING:/d' \
+      -e '/+PACKAGE_\$(PKG_NAME)_INCLUDE_SHORTCUT_FE/d' \
+      "$mk"
+    echo "==> Patched ${mk}: unconditional kmod deps (breaks Kconfig cycle)"
+  fi
+}
+
 patch_feeds() {
   pin_pkg_makefile \
     "feeds/passwall_packages/xray-core/Makefile" \
@@ -103,12 +138,10 @@ patch_feeds() {
   done
 
   for name in luci-app-unblockneteasemusic nftables-json nftables-nojson; do
-    while IFS= read -r dir; do
-      [ -n "$dir" ] || continue
-      rm -rf "$dir"
-      echo "==> Removed conflicting feed package: ${dir}"
-    done < <(find feeds package/feeds package -type d -name "$name" 2>/dev/null || true)
+    remove_tree_named "$name"
   done
+  remove_tree_named "nft-fullcone"
+  patch_dnsmasq_makefile
 
   for feed in feeds/kenzo feeds/small package/feeds/kenzo package/feeds/small; do
     [ -d "$feed" ] || continue
@@ -234,6 +267,8 @@ if [ ! -d package/luci-app-turboacc ] || [ ! -d package/nft-fullcone ]; then
   cp -a "$TMPDIR/turboacc-pkg/nft-fullcone" package/
   verify_makefile package/luci-app-turboacc/Makefile "TurboACC LuCI"
   verify_makefile package/nft-fullcone/Makefile "nft-fullcone kernel module"
+  patch_turboacc_makefile
+  remove_tree_named "nft-fullcone"
   echo "    installed TurboACC (luci-app-turboacc + nft-fullcone)"
 fi
 
@@ -272,6 +307,9 @@ for cfg in "${CONFIG_FILES[@]}"; do
     install_pkg "$pkg" || echo "    skip config package: ${pkg}"
   done < <(extract_kconfig_packages "$cfg")
 done
+
+[ -f package/luci-app-turboacc/Makefile ] && patch_turboacc_makefile
+patch_dnsmasq_makefile
 
 verify_setup
 echo "==> Custom package setup finished"

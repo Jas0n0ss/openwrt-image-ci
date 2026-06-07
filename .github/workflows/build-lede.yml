@@ -98,8 +98,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-lede-v3-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
-          restore-keys: feeds-lede-v3-
+          key: feeds-lede-v4-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', '.github/ci/scrub-config-cycles.sh') }}
+          restore-keys: feeds-lede-v4-
 
       - name: Cache ccache
         uses: actions/cache@v5
@@ -171,16 +171,13 @@ jobs:
           if grep -q 'recursive dependency detected' defconfig.log; then
             echo "=== Kconfig recursive dependency (defconfig) ==="
             grep -E 'recursive dependency|symbol PACKAGE_' defconfig.log || true
-            for sym in dnsmasq-full luci-app-turboacc kmod-nft-fullcone nftables-json nftables-nojson luci-ssl luci-app-unblockneteasemusic; do
-              if grep -q "^CONFIG_PACKAGE_${sym}=y" .config 2>/dev/null; then
-                echo "ERROR: cycle-prone package enabled: ${sym}"
-                exit 1
-              fi
-            done
+            exit 1
           fi
+          bash "${{ github.workspace }}/.github/ci/scrub-config-cycles.sh" .config
           for d in luci-app-turboacc nft-fullcone; do
             [ -d "$STASH/$d" ] && mv "$STASH/$d" "package/$d"
           done
+          rm -rf tmp/.config-package.in tmp/.config-target.in tmp/.config-feeds.in 2>/dev/null || true
           cat "${{ github.workspace }}/configs/snippets/turboacc.config" >> .config
           make oldconfig > oldconfig.log 2>&1 || { echo "make oldconfig failed:"; cat oldconfig.log; exit 1; }
           if grep -q 'recursive dependency detected' oldconfig.log; then
