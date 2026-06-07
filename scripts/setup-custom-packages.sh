@@ -32,6 +32,9 @@ install_pkg() {
   if [ -f "package/${pkg}/Makefile" ]; then
     return 0
   fi
+  if find package/feeds -maxdepth 4 -path "*/${pkg}/Makefile" -print -quit 2>/dev/null | grep -q .; then
+    return 0
+  fi
   ./scripts/feeds install "$pkg" 2>/dev/null
 }
 
@@ -171,12 +174,18 @@ while IFS= read -r dir; do
   rm -rf "$dir"
 done < <(find feeds -name '*fchomo*' -type d 2>/dev/null || true)
 
-echo "==> Installing transitive feed dependencies"
+echo "==> Installing feed dependencies (before PassWall / lean scan)"
 FEED_DEPS=(
+  bc lm-sensors jq zoneinfo-all maccalc
+  luci-compat luci-proto-ipv6 luci-lua-runtime
   wsdd2 luci-app-ksmbd luci-app-samba luci-app-samba4
   ddns-scripts wget-ssl bash
   ntpdate smartmontools gperf
   libnetsnmp libtins libyaml-cpp libgpiod libtirpc libaio
+  pcre2 libpcre2 libxml2 libunistring
+  coreutils coreutils-nohup unzip pciutils
+  libev libsodium c-ares libcurl libudns
+  wireless-regdb iw golang
 )
 for pkg in "${FEED_DEPS[@]}"; do
   install_pkg "$pkg" || echo "    skip feed dep: ${pkg}"
@@ -186,22 +195,16 @@ echo "==> Installing PassWall feeds (required)"
 ./scripts/feeds install -p passwall_packages
 ./scripts/feeds install -p passwall_luci
 
-echo "==> Installing base feed packages (optional failures ignored)"
+echo "==> Installing PassWall / LuCI feed packages"
 BASE_PACKAGES=(
-  maccalc wireless-regdb iw luci-ssl
+  luci-ssl
   luci-i18n-passwall-zh-cn luci-i18n-opkg-zh-cn luci-i18n-ttyd-zh-cn luci-i18n-arpbind-zh-cn
   kmod-mt7615-firmware kmod-mt7915-firmware
-  kmod-tcp-bbr
-  pcre2 libpcre2 libpcre2-8 libxml2 libunistring
-  libev libsodium c-ares libcurl libudns
-  boost boost-system boost-program_options boost-date_time
-  coreutils coreutils-nohup unzip bc pciutils lm-sensors jq yq
-  libpam zoneinfo-all
-  luci-compat luci-proto-ipv6 luci-lua-runtime
+  kmod-tcp-bbr kmod-nft-core kmod-nf-conntrack
+  libpcre2-8 boost boost-system boost-program_options boost-date_time
+  libpam yq
   ttyd luci-app-ttyd libwebsockets-full libuv libjson-c libcap
-  kmod-nft-core kmod-nf-conntrack
   jsonfilter v2ray-geoip v2ray-geosite
-  golang
 )
 for pkg in "${BASE_PACKAGES[@]}"; do
   install_pkg "$pkg" || echo "    skip optional feed package: ${pkg}"
