@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: "设备 (all = 全部 10 台)"
+        description: "all"
         type: choice
         required: true
         default: all
@@ -163,29 +163,47 @@ jobs:
             "${{ github.workspace }}/ipk-cache" \
             "${{ github.workspace }}/release/${{ matrix.device }}"
 
-      - name: Upload artifact
+      - name: Upload firmware artifact
         uses: actions/upload-artifact@v5
         with:
-          name: immortalwrt-fast-${{ matrix.device }}
+          name: fw-immortalwrt-fast-${{ matrix.device }}
           path: release/${{ matrix.device }}
           retention-days: 7
+          if-no-files-found: error
 
   release:
     needs: build
+    if: needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+
       - name: Download all firmware
         uses: actions/download-artifact@v5
         with:
-          pattern: immortalwrt-fast-*
+          pattern: fw-immortalwrt-fast-*
           path: artifacts
           merge-multiple: true
 
-      - name: Prepare release files
+      - name: Bundle into one release
+        env:
+          DEVICE_INPUT: ${{ github.event.inputs.device || 'all' }}
         run: |
+          set -euo pipefail
           mkdir -p release
-          find artifacts -type f -name 'Jas0n0ss-*' -exec cp -t release/ {} +
+          shopt -s nullglob
+          files=(artifacts/**/Jas0n0ss-*)
+          [ "${#files[@]}" -gt 0 ] || { echo "ERROR: no firmware files downloaded" >&2; exit 1; }
+          cp -t release/ "${files[@]}"
+          echo "Bundled ${#files[@]} firmware file(s) into one release:"
           ls -la release/
+          if [ "$DEVICE_INPUT" = "all" ]; then
+            while IFS= read -r dev; do
+              [ -n "$dev" ] || continue
+              ls release/Jas0n0ss-immortalwrt-"${dev}"-* >/dev/null 2>&1 \
+                || { echo "ERROR: missing firmware for device: $dev" >&2; exit 1; }
+            done < <(sed 's/#.*//' configs/devices.list | xargs -n1 | grep -v '^$')
+          fi
 
       - name: Create release
         uses: softprops/action-gh-release@v3
@@ -193,7 +211,7 @@ jobs:
           tag_name: immortalwrt-fast-${{ github.run_number }}
           name: "ImmortalWrt Fast Build #${{ github.run_number }}"
           body: |
-            ImageBuilder 快速构建，全部 10 台设备固件。
+            本次构建全部固件合并在**一个 Release** 下，可直接批量下载。
             自定义插件来自最近一次全量编译缓存的 ipk。
           files: release/Jas0n0ss-*
         env:

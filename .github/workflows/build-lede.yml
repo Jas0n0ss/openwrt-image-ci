@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: "设备 (all = 全部 10 台)"
+        description: "all"
         type: choice
         required: true
         default: all
@@ -205,29 +205,47 @@ jobs:
             "${{ github.workspace }}/configs/lede/${{ matrix.device }}.config" \
             bin/targets "../release/${{ matrix.device }}"
 
-      - name: Upload artifact
+      - name: Upload firmware artifact
         uses: actions/upload-artifact@v5
         with:
-          name: lede-${{ matrix.device }}
+          name: fw-lede-${{ matrix.device }}
           path: release/${{ matrix.device }}
           retention-days: 7
+          if-no-files-found: error
 
   release:
     needs: build
+    if: needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+
       - name: Download all firmware
         uses: actions/download-artifact@v5
         with:
-          pattern: lede-*
+          pattern: fw-lede-*
           path: artifacts
           merge-multiple: true
 
-      - name: Prepare release files
+      - name: Bundle into one release
+        env:
+          DEVICE_INPUT: ${{ github.event.inputs.device || 'all' }}
         run: |
+          set -euo pipefail
           mkdir -p release
-          find artifacts -type f -name 'Jas0n0ss-*' -exec cp -t release/ {} +
+          shopt -s nullglob
+          files=(artifacts/**/Jas0n0ss-*)
+          [ "${#files[@]}" -gt 0 ] || { echo "ERROR: no firmware files downloaded" >&2; exit 1; }
+          cp -t release/ "${files[@]}"
+          echo "Bundled ${#files[@]} firmware file(s) into one release:"
           ls -la release/
+          if [ "$DEVICE_INPUT" = "all" ]; then
+            while IFS= read -r dev; do
+              [ -n "$dev" ] || continue
+              ls release/Jas0n0ss-lede-"${dev}"-* >/dev/null 2>&1 \
+                || { echo "ERROR: missing firmware for device: $dev" >&2; exit 1; }
+            done < <(sed 's/#.*//' configs/devices.list | xargs -n1 | grep -v '^$')
+          fi
 
       - name: Create release
         uses: softprops/action-gh-release@v3
@@ -235,7 +253,7 @@ jobs:
           tag_name: lede-${{ github.run_number }}
           name: "LEDE Build #${{ github.run_number }}"
           body: |
-            全部 10 台设备 LEDE 固件，一次下载。
+            本次构建全部固件合并在**一个 Release** 下，可直接批量下载。
             命名：`Jas0n0ss-lede-<代号>-<设备>-<平台>-<类型>.<后缀>`
           files: release/Jas0n0ss-*
         env:

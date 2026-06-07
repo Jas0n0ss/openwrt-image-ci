@@ -39,7 +39,7 @@ Actions → 选 workflow → Run workflow → device 选 all 或单台设备
 
 **仅手动触发**（push / 定时已关闭）。可选择 **all**（10 台）或 **单台设备**（如 `r2s`）。
 
-产物在 **Releases**（一次 build 全部 10 台固件在一个 Release 里）或 Artifacts 下载。
+选择 **all** 构建时，所有设备固件会自动合并到**同一个 Release**（`lede-<编号>` / `immortalwrt-<编号>` / `immortalwrt-fast-<编号>`），也可从 Actions Artifacts 下载单台。
 
 ## 默认凭据
 
