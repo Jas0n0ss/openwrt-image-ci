@@ -20,7 +20,7 @@
 
 ## 使用建议
 
-1. **日常测试**：只编一台设备，不要频繁用 `all`（11 路并行会抢缓存、变慢）。
+1. **日常测试**：只编一台设备，不要频繁用 `all`（10 路并行会抢缓存、变慢）。
 2. **第二次编同平台**：例如先编 `redmi-ax6000`，再编 `xiaomi-ax6000`，ccache 命中率更高。
 3. **大改配置后**：修改 `configs/custom-plugins.config` 或 `setup-custom-packages.sh` 会刷新 cache key，首次仍较慢属正常。
 4. **更快方案（需自备）**：自托管 Runner + 持久磁盘保留 `dl/`、`build_dir/`、`~/.ccache`。

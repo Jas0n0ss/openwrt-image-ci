@@ -18,7 +18,6 @@
 | 小米 AX6000 | `xiaomi-ax6000` |
 | 红米 AX6000 | `redmi-ax6000` |
 | 斐讯 K2P | `phicomm-k2p` |
-| 小米路由 3G | `xiaomi-3g` |
 | 小米 CR660x | `xiaomi-cr660x` |
 | NanoPi R2S | `r2s` |
 | x86_64 | `x86_64` |
@@ -30,17 +29,17 @@
 
 | Workflow | 说明 | 耗时 |
 |----------|------|------|
-| **Build LEDE** | 全量编译 11 台 LEDE | 数小时 |
-| **Build ImmortalWrt** | 全量编译 11 台 ImmortalWrt | 数小时 |
+| **Build LEDE** | 全量编译 10 台 LEDE | 数小时 |
+| **Build ImmortalWrt** | 全量编译 10 台 ImmortalWrt | 数小时 |
 | **Build ImmortalWrt (Fast)** | ImageBuilder 快速打包（类似 [固件选择器](https://firmware-selector.immortalwrt.org/)） | 约 30～60 分钟 |
 
 ```
 Actions → 选 workflow → Run workflow → device 选 all 或单台设备
 ```
 
-**仅手动触发**（push / 定时已关闭）。可选择 **all**（11 台）或 **单台设备**（如 `r2s`）。
+**仅手动触发**（push / 定时已关闭）。可选择 **all**（10 台）或 **单台设备**（如 `r2s`）。
 
-产物在 **Releases**（一次 build 全部 11 台固件在一个 Release 里）或 Artifacts 下载。
+产物在 **Releases**（一次 build 全部 10 台固件在一个 Release 里）或 Artifacts 下载。
 
 ## 默认凭据
 

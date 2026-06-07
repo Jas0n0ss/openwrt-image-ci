@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: "设备 (all = 全部 11 台)"
+        description: "设备 (all = 全部 10 台)"
         type: choice
         required: true
         default: all
@@ -19,7 +19,6 @@ on:
           - xiaomi-ax6000
           - redmi-ax6000
           - phicomm-k2p
-          - xiaomi-3g
           - xiaomi-cr660x
           - r2s
           - x86_64
@@ -194,7 +193,7 @@ jobs:
           tag_name: immortalwrt-fast-${{ github.run_number }}
           name: "ImmortalWrt Fast Build #${{ github.run_number }}"
           body: |
-            ImageBuilder 快速构建，全部 11 台设备固件。
+            ImageBuilder 快速构建，全部 10 台设备固件。
             自定义插件来自最近一次全量编译缓存的 ipk。
           files: release/Jas0n0ss-*
         env:

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: "设备 (all = 全部 11 台)"
+        description: "设备 (all = 全部 10 台)"
         type: choice
         required: true
         default: all
@@ -16,7 +16,6 @@ on:
           - xiaomi-ax6000
           - redmi-ax6000
           - phicomm-k2p
-          - xiaomi-3g
           - xiaomi-cr660x
           - r2s
           - x86_64
@@ -292,7 +291,7 @@ jobs:
           tag_name: immortalwrt-${{ github.run_number }}
           name: "ImmortalWrt Build #${{ github.run_number }}"
           body: |
-            全部 11 台设备 ImmortalWrt 固件，一次下载。
+            全部 10 台设备 ImmortalWrt 固件，一次下载。
             命名：`Jas0n0ss-immortalwrt-<代号>-<设备>-<平台>-<类型>.<后缀>`
           files: release/Jas0n0ss-*
         env:
