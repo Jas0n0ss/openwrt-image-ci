@@ -93,6 +93,12 @@ jobs:
           path: ${{ env.SRC_DIR }}
           fetch-depth: 1
 
+      - name: Verify CI workspace
+        run: |
+          set -euo pipefail
+          test -f "$GITHUB_WORKSPACE/scripts/setup-custom-packages.sh"
+          test -d "$GITHUB_WORKSPACE/configs"
+
       - name: Cache dl
         uses: actions/cache@v5
         with:
@@ -116,7 +122,7 @@ jobs:
 
       - name: Setup feeds and packages
         working-directory: ${{ env.SRC_DIR }}
-        run: bash ${{ github.workspace }}/scripts/setup-custom-packages.sh . append ${{ github.workspace }}/configs
+        run: bash $GITHUB_WORKSPACE/scripts/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
 
       - name: Prepare overlay
         run: |
@@ -128,14 +134,14 @@ jobs:
         working-directory: ${{ env.SRC_DIR }}
         run: |
           set -euo pipefail
-          cat "${{ github.workspace }}/configs/lede/${{ matrix.device }}.config" > .config
-          cat "${{ github.workspace }}/configs/lede/common.config" >> .config
-          cat "${{ github.workspace }}/configs/custom-plugins.config" >> .config
+          cat "$GITHUB_WORKSPACE/configs/lede/${{ matrix.device }}.config" > .config
+          cat "$GITHUB_WORKSPACE/configs/lede/common.config" >> .config
+          cat "$GITHUB_WORKSPACE/configs/custom-plugins.config" >> .config
           for snip in \
-            "${{ github.workspace }}/configs/snippets/wireless-core.config" \
-            "${{ github.workspace }}/configs/snippets/luci-zh-cn.config" \
-            "${{ github.workspace }}/configs/snippets/no-rust-passwall.config" \
-            "${{ github.workspace }}/configs/snippets/no-selinux.config"; do
+            "$GITHUB_WORKSPACE/configs/snippets/wireless-core.config" \
+            "$GITHUB_WORKSPACE/configs/snippets/luci-zh-cn.config" \
+            "$GITHUB_WORKSPACE/configs/snippets/no-rust-passwall.config" \
+            "$GITHUB_WORKSPACE/configs/snippets/no-selinux.config"; do
             [ -f "$snip" ] && cat "$snip" >> .config
           done
           echo "CONFIG_DEVEL=y" >> .config
@@ -170,12 +176,12 @@ jobs:
             grep -E 'recursive dependency|symbol PACKAGE_' defconfig.log || true
             exit 1
           fi
-          bash "${{ github.workspace }}/.github/ci/scrub-config-cycles.sh" .config
+          bash "$GITHUB_WORKSPACE/.github/ci/scrub-config-cycles.sh" .config
           for d in luci-app-turboacc nft-fullcone; do
             [ -d "$STASH/$d" ] && mv "$STASH/$d" "package/$d"
           done
           rm -rf tmp/.config-package.in tmp/.config-target.in tmp/.config-feeds.in 2>/dev/null || true
-          cat "${{ github.workspace }}/configs/snippets/turboacc.config" >> .config
+          cat "$GITHUB_WORKSPACE/configs/snippets/turboacc.config" >> .config
           make oldconfig > oldconfig.log 2>&1 || { echo "make oldconfig failed:"; cat oldconfig.log; exit 1; }
           if grep -q 'recursive dependency detected' oldconfig.log; then
             echo "=== Kconfig recursive dependency (oldconfig) ==="
@@ -194,9 +200,9 @@ jobs:
       - name: Pack firmware
         working-directory: ${{ env.SRC_DIR }}
         run: |
-          bash ${{ github.workspace }}/.github/ci/pack-firmware.sh \
+          bash $GITHUB_WORKSPACE/.github/ci/pack-firmware.sh \
             "${{ matrix.device }}" lede \
-            "${{ github.workspace }}/configs/lede/${{ matrix.device }}.config" \
+            "$GITHUB_WORKSPACE/configs/lede/${{ matrix.device }}.config" \
             bin/targets "../release/${{ matrix.device }}"
 
       - name: Upload firmware artifact

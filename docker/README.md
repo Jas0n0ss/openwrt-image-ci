@@ -17,6 +17,8 @@ ghcr.io/<owner>/<repo>/builder:latest
 2. 等待镜像发布到 GHCR（仓库 **Packages** 页可见）
 3. 再跑 **Build LEDE** / **Build ImmortalWrt**
 
+容器 job 内请使用环境变量 `$GITHUB_WORKSPACE` 引用仓库路径（不要用 `github.workspace` 表达式，其在容器内指向不存在的宿主机路径）。
+
 ## 本地调试
 
 ```bash
