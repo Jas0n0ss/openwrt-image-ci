@@ -92,18 +92,12 @@ patch_dnsmasq_makefile() {
   fi
 }
 
-patch_turboacc_makefile() {
-  local mk="package/luci-app-turboacc/Makefile"
-  [ -f "$mk" ] || return 0
-  if grep -q 'PACKAGE_\$(PKG_NAME)_INCLUDE_NFT_FULLCONE:kmod-nft-fullcone' "$mk"; then
-    sed -i \
-      -e 's/+PACKAGE_\$(PKG_NAME)_INCLUDE_BBR_CCA:kmod-tcp-bbr/+kmod-tcp-bbr/' \
-      -e 's/+PACKAGE_\$(PKG_NAME)_INCLUDE_NFT_FULLCONE:kmod-nft-fullcone/+kmod-nft-fullcone/' \
-      -e '/+PACKAGE_\$(PKG_NAME)_INCLUDE_OFFLOADING:/d' \
-      -e '/+PACKAGE_\$(PKG_NAME)_INCLUDE_SHORTCUT_FE/d' \
-      "$mk"
-    echo "==> Patched ${mk}: unconditional kmod deps (breaks Kconfig cycle)"
-  fi
+apply_turboacc_overlay() {
+  local overlay="$SCRIPT_DIR/overlays/luci-app-turboacc/Makefile"
+  [ -d package/luci-app-turboacc ] || return 0
+  [ -f "$overlay" ] || { echo "ERROR: missing $overlay" >&2; exit 1; }
+  cp -f "$overlay" package/luci-app-turboacc/Makefile
+  echo "==> Applied luci-app-turboacc Makefile overlay"
 }
 
 patch_feeds() {
@@ -267,7 +261,7 @@ if [ ! -d package/luci-app-turboacc ] || [ ! -d package/nft-fullcone ]; then
   cp -a "$TMPDIR/turboacc-pkg/nft-fullcone" package/
   verify_makefile package/luci-app-turboacc/Makefile "TurboACC LuCI"
   verify_makefile package/nft-fullcone/Makefile "nft-fullcone kernel module"
-  patch_turboacc_makefile
+  apply_turboacc_overlay
   remove_tree_named "nft-fullcone"
   echo "    installed TurboACC (luci-app-turboacc + nft-fullcone)"
 fi
@@ -308,8 +302,8 @@ for cfg in "${CONFIG_FILES[@]}"; do
   done < <(extract_kconfig_packages "$cfg")
 done
 
-[ -f package/luci-app-turboacc/Makefile ] && patch_turboacc_makefile
-patch_dnsmasq_makefile
+PATCH_SCRIPT="$(cd "$SCRIPT_DIR/.." && pwd)/.github/ci/patch-kconfig-tree.sh"
+PATCH_OVERLAY="$SCRIPT_DIR/overlays" bash "$PATCH_SCRIPT" .
 
 verify_setup
 echo "==> Custom package setup finished"

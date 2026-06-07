@@ -113,8 +113,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-lede-v4-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh', '.github/ci/scrub-config-cycles.sh') }}
-          restore-keys: feeds-lede-v4-
+          key: feeds-lede-v5-${{ hashFiles('configs/**', 'scripts/**', '.github/ci/**') }}
+          restore-keys: feeds-lede-v5-
 
       - name: Cache ccache
         uses: actions/cache@v5
@@ -168,11 +168,9 @@ jobs:
         working-directory: ${{ env.SRC_DIR }}
         run: |
           set -euo pipefail
-          STASH=".ci-stash-turboacc"
-          mkdir -p "$STASH"
-          for d in luci-app-turboacc nft-fullcone; do
-            [ -d "package/$d" ] && mv "package/$d" "$STASH/$d"
-          done
+          PATCH="$GITHUB_WORKSPACE/.github/ci/patch-kconfig-tree.sh"
+          export PATCH_OVERLAY="$GITHUB_WORKSPACE/scripts/overlays"
+          bash "$PATCH" .
           make defconfig > defconfig.log 2>&1 || { echo "make defconfig failed:"; cat defconfig.log; exit 1; }
           if grep -q 'recursive dependency detected' defconfig.log; then
             echo "=== Kconfig recursive dependency (defconfig) ==="
@@ -180,9 +178,7 @@ jobs:
             exit 1
           fi
           bash "$GITHUB_WORKSPACE/.github/ci/scrub-config-cycles.sh" .config
-          for d in luci-app-turboacc nft-fullcone; do
-            [ -d "$STASH/$d" ] && mv "$STASH/$d" "package/$d"
-          done
+          bash "$PATCH" .
           rm -rf tmp/.config-package.in tmp/.config-target.in tmp/.config-feeds.in 2>/dev/null || true
           cat "$GITHUB_WORKSPACE/configs/snippets/turboacc.config" >> .config
           make oldconfig > oldconfig.log 2>&1 || { echo "make oldconfig failed:"; cat oldconfig.log; exit 1; }
