@@ -30,18 +30,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - id: image
+        run: |
+          base="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/builder"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
       - uses: docker/build-push-action@v6
         with:
           context: docker
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/builder:22.04
-            ghcr.io/${{ github.repository }}/builder:latest
+            ${{ steps.image.outputs.base }}:22.04
+            ${{ steps.image.outputs.base }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Image summary
         run: |
           echo "Published:"
-          echo "  ghcr.io/${{ github.repository }}/builder:22.04"
-          echo "  ghcr.io/${{ github.repository }}/builder:latest"
+          echo "  ${{ steps.image.outputs.base }}:22.04"
+          echo "  ${{ steps.image.outputs.base }}:latest"

@@ -48,8 +48,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.resolve.outputs.matrix }}
+      builder_image: ${{ steps.image.outputs.ref }}
     steps:
       - uses: actions/checkout@v5
+      - id: image
+        run: |
+          ref="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/builder:22.04"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - id: resolve
         run: |
           set -euo pipefail
@@ -69,7 +74,7 @@ jobs:
     needs: setup
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/${{ github.repository }}/builder:22.04
+      image: ${{ needs.setup.outputs.builder_image }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

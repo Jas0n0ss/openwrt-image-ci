@@ -7,7 +7,7 @@
 ## 镜像地址
 
 ```
-ghcr.io/<owner>/<repo>/builder:22.04
+ghcr.io/<owner>/<repo>/builder:22.04   # GHCR 要求全小写，如 jas0n0ss/openwrt-image-ci
 ghcr.io/<owner>/<repo>/builder:latest
 ```
 
