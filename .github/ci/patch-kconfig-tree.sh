@@ -35,21 +35,28 @@ remove_pkg_by_name() {
   done < <(find feeds package/feeds package -type d -name "$name" 2>/dev/null || true)
 }
 
-remove_feed_nft_fullcone_dupes() {
+remove_nft_fullcone_dupes() {
   local mk dir
   while IFS= read -r mk; do
     [ -n "$mk" ] || continue
     dir="${mk%/Makefile}"
     is_protected_pkg_dir "$dir" && continue
     rm -rf "$dir"
-    echo "==> removed feed nft-fullcone dupe: ${dir}"
-  done < <(grep -rl 'PKG_NAME:=nft-fullcone$' feeds package/feeds 2>/dev/null || true)
+    echo "==> removed nft-fullcone dupe: ${dir}"
+  done < <(grep -rl 'PKG_NAME:=nft-fullcone$' feeds package/feeds package 2>/dev/null || true)
+  while IFS= read -r mk; do
+    [ -n "$mk" ] || continue
+    dir="${mk%/Makefile}"
+    is_protected_pkg_dir "$dir" && continue
+    rm -rf "$dir"
+    echo "==> removed KernelPackage/nft-fullcone dupe: ${dir}"
+  done < <(grep -rl 'KernelPackage/nft-fullcone' feeds package/feeds package 2>/dev/null || true)
   while IFS= read -r dir; do
     [ -n "$dir" ] || continue
     is_protected_pkg_dir "$dir" && continue
     rm -rf "$dir"
-    echo "==> removed feed nft-fullcone dir: ${dir}"
-  done < <(find feeds package/feeds -type d -name 'nft-fullcone' 2>/dev/null || true)
+    echo "==> removed nft-fullcone dir: ${dir}"
+  done < <(find feeds package/feeds package -type d -name 'nft-fullcone' 2>/dev/null || true)
 }
 
 patch_dnsmasq() {
@@ -83,13 +90,27 @@ apply_turboacc_overlay() {
   echo "==> applied luci-app-turboacc Makefile overlay (no kmod LUCI_DEPENDS)"
 }
 
+apply_nft_fullcone_overlay() {
+  local mk="package/nft-fullcone/Makefile"
+  local overlay="$OVERLAY/nft-fullcone/Makefile"
+  [ -f "$overlay" ] || { echo "ERROR: missing $overlay" >&2; exit 1; }
+  [ -d package/nft-fullcone ] || return 0
+  cp -f "$overlay" "$mk"
+  echo "==> applied nft-fullcone Makefile overlay (no @IPV6 / PROVIDES cycle)"
+}
+
 echo "==> patch-kconfig-tree in $(pwd)"
 remove_pkg_by_name "nftables-json"
 remove_pkg_by_name "nftables-nojson"
-remove_feed_nft_fullcone_dupes
+remove_nft_fullcone_dupes
 patch_dnsmasq
 patch_nftables_makefile
 apply_turboacc_overlay
-[ -f package/nft-fullcone/Makefile ] \
-  || { echo "ERROR: missing package/nft-fullcone (custom clone required)" >&2; exit 1; }
+apply_nft_fullcone_overlay
+if [ -d package/nft-fullcone ]; then
+  [ -f package/nft-fullcone/Makefile ] \
+    || { echo "ERROR: missing package/nft-fullcone/Makefile" >&2; exit 1; }
+else
+  echo "==> note: package/nft-fullcone not present (stashed for defconfig)"
+fi
 echo "==> patch-kconfig-tree done"

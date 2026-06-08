@@ -40,7 +40,7 @@ CI 逻辑在 `.github/workflows/` 与 `.github/ci/`；`scripts/` 仅保留自定
 
 已关闭 `INCLUDE_OFFLOADING`（`kmod-fast-classifier` / shortcut-fe 仅部分平台存在）。保留 BBR + nft-fullcone。
 
-**不要**在 `device.config` / `common.config` / `custom-plugins.config` 里启用 TurboACC。`luci-app-turboacc` 使用 `scripts/overlays/luci-app-turboacc/Makefile`（**无** `LUCI_DEPENDS → kmod-*`，避免 Kconfig 环）；`kmod-tcp-bbr` / `kmod-nft-fullcone` 仅在 `configs/snippets/turboacc.config` 里启用。每次 `make defconfig/oldconfig` 前运行 `.github/ci/patch-kconfig-tree.sh` 删除 `nftables-json` 重复包并重新打补丁。
+**不要**在 `device.config` / `common.config` / `custom-plugins.config` 里启用 TurboACC。`luci-app-turboacc` / `nft-fullcone` 使用 `scripts/overlays/` Makefile（无 `@IPV6`/`PROVIDES`/条件 `LUCI_DEPENDS`）；`kmod-tcp-bbr` / `kmod-nft-fullcone` 仅在 `configs/snippets/turboacc.config` 里启用。`defconfig-turboacc.sh` 在 base `make defconfig` 前**暂存** TurboACC 包，defconfig 后恢复并 `oldconfig`；每次 defconfig/oldconfig 前运行 `patch-kconfig-tree.sh` 删除 feed 重复 `nft-fullcone`/`nftables-json`。
 
 ## 生成 .config（workflow 内联）
 

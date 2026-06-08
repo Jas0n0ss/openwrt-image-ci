@@ -100,6 +100,14 @@ apply_turboacc_overlay() {
   echo "==> Applied luci-app-turboacc Makefile overlay"
 }
 
+apply_nft_fullcone_overlay() {
+  local overlay="$SCRIPT_DIR/overlays/nft-fullcone/Makefile"
+  [ -d package/nft-fullcone ] || return 0
+  [ -f "$overlay" ] || { echo "ERROR: missing $overlay" >&2; exit 1; }
+  cp -f "$overlay" package/nft-fullcone/Makefile
+  echo "==> Applied nft-fullcone Makefile overlay"
+}
+
 patch_feeds() {
   pin_pkg_makefile \
     "feeds/passwall_packages/xray-core/Makefile" \
@@ -131,10 +139,9 @@ patch_feeds() {
     fi
   done
 
-  for name in luci-app-unblockneteasemusic nftables-json nftables-nojson; do
+  for name in luci-app-unblockneteasemusic nftables-json nftables-nojson nft-fullcone; do
     remove_tree_named "$name"
   done
-  remove_tree_named "nft-fullcone"
   patch_dnsmasq_makefile
 
   for feed in feeds/kenzo feeds/small package/feeds/kenzo package/feeds/small; do
@@ -262,6 +269,7 @@ if [ ! -d package/luci-app-turboacc ] || [ ! -d package/nft-fullcone ]; then
   verify_makefile package/luci-app-turboacc/Makefile "TurboACC LuCI"
   verify_makefile package/nft-fullcone/Makefile "nft-fullcone kernel module"
   apply_turboacc_overlay
+  apply_nft_fullcone_overlay
   remove_tree_named "nft-fullcone"
   echo "    installed TurboACC (luci-app-turboacc + nft-fullcone)"
 fi

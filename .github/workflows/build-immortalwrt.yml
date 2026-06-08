@@ -97,8 +97,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-immortalwrt-v5-${{ hashFiles('configs/**', 'scripts/**', '.github/ci/**') }}
-          restore-keys: feeds-immortalwrt-v5-
+          key: feeds-immortalwrt-v6-${{ hashFiles('configs/**', 'scripts/**', '.github/ci/**') }}
+          restore-keys: feeds-immortalwrt-v6-
 
       - name: Cache ccache
         uses: actions/cache@v5
