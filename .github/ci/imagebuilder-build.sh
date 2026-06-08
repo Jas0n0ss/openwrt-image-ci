@@ -11,19 +11,11 @@ IPK_CACHE="${4:?ipk cache}"
 OUT_DIR="${5:?output dir}"
 IB_BASE="${IB_BASE:-https://downloads.immortalwrt.org/snapshots}"
 CI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/device.sh
+source "$CI_DIR/lib/device.sh"
 
 CFG="$ROOT/immortalwrt/${DEVICE}.config"
 [ -f "$CFG" ] || { echo "ERROR: missing $CFG" >&2; exit 1; }
-
-arch_from_config() {
-  if grep -q '^CONFIG_TARGET_x86_64=y' "$1"; then echo x86_64
-  elif grep -q '^CONFIG_TARGET_qualcommax_ipq807x=y' "$1"; then echo aarch64_cortex-a53
-  elif grep -q '^CONFIG_TARGET_mediatek_filogic=y' "$1"; then echo aarch64_cortex-a53
-  elif grep -q '^CONFIG_TARGET_ramips_mt7621=y' "$1"; then echo mips_24kc
-  elif grep -q '^CONFIG_TARGET_rockchip_armv8=y' "$1"; then echo aarch64_generic
-  elif grep -q '^CONFIG_TARGET_bcm27xx_bcm2711=y' "$1"; then echo aarch64_cortex-a72
-  else echo "ERROR: unknown target in $1" >&2; return 1; fi
-}
 
 resolve_ipk_dir() {
   local predicted="$1" cache="$2" dir alt

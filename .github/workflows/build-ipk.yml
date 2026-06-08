@@ -1,0 +1,141 @@
+# 按架构编译自定义 ipk（5 个 job），供 Build firmware 使用
+
+name: Build ipk
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+  actions: read
+
+concurrency:
+  group: ipk-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Shanghai
+  UPSTREAM: immortalwrt/immortalwrt
+  SRC_DIR: src
+  CCACHE_DIR: ~/.ccache
+  CCACHE_COMPRESS: "true"
+  CCACHE_MAXSIZE: 10G
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+      builder_image: ${{ steps.image.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: image
+        run: |
+          source .github/ci/lib/device.sh
+          echo "ref=$(builder_image_ref '${{ github.repository }}')" >> "$GITHUB_OUTPUT"
+      - id: resolve
+        run: bash .github/ci/resolve-ipk-matrix.sh
+
+  build:
+    needs: setup
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ${{ needs.setup.outputs.builder_image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    name: ipk · ${{ matrix.arch }} (${{ matrix.device }})
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.UPSTREAM }}
+          ref: master
+          path: ${{ env.SRC_DIR }}
+          fetch-depth: 1
+
+      - name: Verify CI workspace
+        run: |
+          set -euo pipefail
+          test -f "$GITHUB_WORKSPACE/scripts/setup-custom-packages.sh"
+          test -d "$GITHUB_WORKSPACE/configs"
+
+      - name: Cache dl
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SRC_DIR }}/dl
+          key: dl-ipk-${{ matrix.arch }}-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
+          restore-keys: |
+            dl-ipk-${{ matrix.arch }}-
+            dl-immortalwrt-
+
+      - name: Cache feeds
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.SRC_DIR }}/feeds
+          key: feeds-ipk-v1-${{ hashFiles('configs/**', 'scripts/**', '.github/ci/**') }}
+          restore-keys: feeds-ipk-v1-
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: ~/.ccache
+          key: ccache-ipk-${{ matrix.arch }}-${{ hashFiles('configs/immortalwrt/common.config', 'configs/custom-plugins.config') }}
+          restore-keys: ccache-ipk-${{ matrix.arch }}-
+
+      - name: Setup feeds and packages
+        working-directory: ${{ env.SRC_DIR }}
+        run: bash $GITHUB_WORKSPACE/scripts/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
+
+      - name: Prepare overlay
+        run: bash $GITHUB_WORKSPACE/.github/ci/prepare-overlay.sh immortalwrt "${{ env.SRC_DIR }}"
+
+      - name: Generate .config
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          bash $GITHUB_WORKSPACE/.github/ci/merge-config.sh \
+            immortalwrt "${{ matrix.device }}" .
+
+      - name: Defconfig and TurboACC
+        working-directory: ${{ env.SRC_DIR }}
+        run: bash $GITHUB_WORKSPACE/.github/ci/defconfig-turboacc.sh .
+
+      - name: Compile
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/ccache:$PATH"
+          make download -j8
+          make toolchain/compile -j"$(nproc)" || make toolchain/compile -j1 V=s
+          make -j"$(nproc)" || make -j1 V=s
+
+      - name: Collect custom ipk
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          bash $GITHUB_WORKSPACE/.github/ci/collect-ipk.sh \
+            . "$GITHUB_WORKSPACE/configs" "../ipk-staging/${{ matrix.arch }}"
+
+      - name: Save custom ipk cache
+        uses: actions/cache/save@v4
+        with:
+          path: ipk-staging/${{ matrix.arch }}
+          key: ipk-${{ matrix.arch }}-${{ github.run_id }}
+
+      - name: Upload ipk artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: immortalwrt-ipk-${{ matrix.arch }}
+          path: ipk-staging/${{ matrix.arch }}
+          retention-days: 30
+          if-no-files-found: error

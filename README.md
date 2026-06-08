@@ -1,8 +1,9 @@
 # OpenWrt / LEDE 固件构建
 
+[![Build firmware](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-firmware.yml?branch=main&label=firmware)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-firmware.yml)
+[![Build ipk](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-ipk.yml?branch=main&label=ipk)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-ipk.yml)
 [![Build LEDE](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-lede.yml?branch=main)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-lede.yml)
-[![Build ImmortalWrt](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-immortalwrt.yml?branch=main)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-immortalwrt.yml)
-[![Build ImmortalWrt Fast](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-immortalwrt-fast.yml?branch=main&label=immortalwrt-fast)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-immortalwrt-fast.yml)
+[![Build ImmortalWrt](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/openwrt-lede-builder/build-immortalwrt.yml?branch=main&label=immortalwrt-full)](https://github.com/Jas0n0ss/openwrt-lede-builder/actions/workflows/build-immortalwrt.yml)
 [![GitHub release](https://img.shields.io/github/v/release/Jas0n0ss/openwrt-lede-builder)](https://github.com/Jas0n0ss/openwrt-lede-builder/releases)
 [![License](https://img.shields.io/github/license/Jas0n0ss/openwrt-lede-builder)](https://github.com/Jas0n0ss/openwrt-lede-builder/blob/main/LICENSE)
 
@@ -23,24 +24,32 @@
 | x86_64 | `x86_64` |
 | 树莓派 4B | `raspberrypi-4b` |
 
-## CI
+## CI 工作流
 
-编译环境使用 GHCR 预构建镜像 `ghcr.io/<owner>/<repo>/builder:22.04`（见 `docker/`），省去每次 `apt install`。首次推送 `docker/` 后先跑 **Build builder Docker image**，再跑固件构建。
+编译环境使用 GHCR 预构建镜像 `ghcr.io/<owner>/<repo>/builder:22.04`（见 `docker/`）。首次推送 `docker/` 后先跑 **Build builder Docker image**，再跑固件构建。
 
-| Workflow | 说明 | 耗时 |
-|----------|------|------|
-| **Build builder Docker image** | 发布编译环境镜像到 GHCR | 约 5 分钟 |
-| **Build LEDE** | 全量编译 10 台 LEDE | 数小时 |
-| **Build ImmortalWrt** | 全量编译 10 台 ImmortalWrt | 数小时 |
-| **Build ImmortalWrt (Fast)** | ImageBuilder 快速打包（类似 [固件选择器](https://firmware-selector.immortalwrt.org/)） | 约 30～60 分钟 |
+| Workflow | 用途 | 频率 | 耗时 |
+|----------|------|------|------|
+| **Build builder Docker image** | 发布编译环境镜像到 GHCR | 按需 | ~5 分钟 |
+| **Build ipk** | 按架构编译自定义插件 ipk（5 个 job） | 插件变更时 | 数小时 |
+| **Build firmware** | ImageBuilder 日常固件（**推荐**） | 配置/overlay 变更 | ~30–60 分钟 |
+| **Build ImmortalWrt** | 全量源码编译 + ipk | 高级/兜底 | 数小时 |
+| **Build LEDE** | LEDE 全量源码编译 | 高级 | 数小时 |
+
+推荐流程：
+
+```
+1. Build ipk          → 生成各架构自定义 ipk（profiles/arch-canonical.list）
+2. Build firmware     → ImageBuilder 打包 10 台固件（自动拉取 ipk 缓存/产物）
+```
 
 ```
 Actions → 选 workflow → Run workflow → device 选 all 或单台设备
 ```
 
-**仅手动触发**（push / 定时已关闭）。可选择 **all**（10 台）或 **单台设备**（如 `r2s`）。
+**仅手动触发**（push / 定时已关闭）。选择 **all** 时，所有设备固件合并到**同一个 Release**（`firmware-<编号>` / `immortalwrt-<编号>` / `lede-<编号>`）。
 
-选择 **all** 构建时，所有设备固件会自动合并到**同一个 Release**（`lede-<编号>` / `immortalwrt-<编号>` / `immortalwrt-fast-<编号>`），也可从 Actions Artifacts 下载单台。
+共享 CI 脚本位于 `.github/ci/`（`merge-config.sh`、`defconfig-turboacc.sh`、`fetch-ipk-cache.sh` 等），全量编译与 ipk 流水线共用同一套 Kconfig 修复逻辑。
 
 ## 默认凭据
 

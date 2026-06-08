@@ -1,3 +1,5 @@
+# 全量编译 LEDE（高级，数小时）— 日常 ImmortalWrt 请用 Build firmware
+
 name: Build LEDE
 
 on:
@@ -51,22 +53,10 @@ jobs:
       - uses: actions/checkout@v5
       - id: image
         run: |
-          ref="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/builder:22.04"
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          source .github/ci/lib/device.sh
+          echo "ref=$(builder_image_ref '${{ github.repository }}')" >> "$GITHUB_OUTPUT"
       - id: resolve
-        run: |
-          set -euo pipefail
-          DEVICE="${{ github.event.inputs.device || 'all' }}"
-          mapfile -t ALL_DEVICES < <(sed 's/#.*//' configs/devices.list | xargs -n1 | grep -v '^$')
-          if [ "$DEVICE" = "all" ] || [ -z "$DEVICE" ]; then
-            json=$(printf '"%s",' "${ALL_DEVICES[@]}" | sed 's/,$//')
-            echo "matrix={\"device\":[${json}]}" >> "$GITHUB_OUTPUT"
-          else
-            for d in "${ALL_DEVICES[@]}"; do
-              [ "$d" = "$DEVICE" ] && { echo "matrix={\"device\":[\"${DEVICE}\"]}" >> "$GITHUB_OUTPUT"; exit 0; }
-            done
-            echo "ERROR: unknown device '$DEVICE'" >&2; exit 1
-          fi
+        run: bash .github/ci/resolve-matrix.sh "${{ github.event.inputs.device || 'all' }}"
 
   build:
     needs: setup
@@ -128,65 +118,17 @@ jobs:
         run: bash $GITHUB_WORKSPACE/scripts/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
 
       - name: Prepare overlay
-        run: |
-          bash scripts/generate-banner.sh lede files
-          bash scripts/bundle-oh-my-bash.sh files
-          bash scripts/install-files-overlay.sh "${{ env.SRC_DIR }}" files
+        run: bash $GITHUB_WORKSPACE/.github/ci/prepare-overlay.sh lede "${{ env.SRC_DIR }}"
 
       - name: Generate .config
         working-directory: ${{ env.SRC_DIR }}
         run: |
-          set -euo pipefail
-          cat "$GITHUB_WORKSPACE/configs/lede/${{ matrix.device }}.config" > .config
-          cat "$GITHUB_WORKSPACE/configs/lede/common.config" >> .config
-          cat "$GITHUB_WORKSPACE/configs/custom-plugins.config" >> .config
-          for snip in \
-            "$GITHUB_WORKSPACE/configs/snippets/wireless-core.config" \
-            "$GITHUB_WORKSPACE/configs/snippets/luci-zh-cn.config" \
-            "$GITHUB_WORKSPACE/configs/snippets/no-rust-passwall.config" \
-            "$GITHUB_WORKSPACE/configs/snippets/no-selinux.config"; do
-            [ -f "$snip" ] && cat "$snip" >> .config
-          done
-          echo "CONFIG_DEVEL=y" >> .config
-          echo "CONFIG_CCACHE=y" >> .config
-          sed -i \
-            -e '/^CONFIG_PACKAGE_dnsmasq-full=y$/d' \
-            -e '/^CONFIG_PACKAGE_dnsmasq_full_/d' \
-            -e '/^CONFIG_PACKAGE_nftables-json=y$/d' \
-            -e '/^CONFIG_PACKAGE_nftables-nojson=y$/d' \
-            -e '/^CONFIG_PACKAGE_luci-app-turboacc/d' \
-            -e '/^CONFIG_PACKAGE_kmod-nft-fullcone=y$/d' \
-            -e '/^CONFIG_PACKAGE_kmod-tcp-bbr=y$/d' \
-            .config
-          {
-            echo "# CONFIG_PACKAGE_dnsmasq-full is not set"
-            echo "# CONFIG_PACKAGE_nftables-json is not set"
-            echo "# CONFIG_PACKAGE_nftables-nojson is not set"
-          } >> .config
+          bash $GITHUB_WORKSPACE/.github/ci/merge-config.sh \
+            lede "${{ matrix.device }}" .
 
       - name: Defconfig and TurboACC
         working-directory: ${{ env.SRC_DIR }}
-        run: |
-          set -euo pipefail
-          PATCH="$GITHUB_WORKSPACE/.github/ci/patch-kconfig-tree.sh"
-          export PATCH_OVERLAY="$GITHUB_WORKSPACE/scripts/overlays"
-          bash "$PATCH" .
-          make defconfig > defconfig.log 2>&1 || { echo "make defconfig failed:"; cat defconfig.log; exit 1; }
-          if grep -q 'recursive dependency detected' defconfig.log; then
-            echo "=== Kconfig recursive dependency (defconfig) ==="
-            grep -E 'recursive dependency|symbol PACKAGE_' defconfig.log || true
-            exit 1
-          fi
-          bash "$GITHUB_WORKSPACE/.github/ci/scrub-config-cycles.sh" .config
-          bash "$PATCH" .
-          rm -rf tmp/.config-package.in tmp/.config-target.in tmp/.config-feeds.in 2>/dev/null || true
-          cat "$GITHUB_WORKSPACE/configs/snippets/turboacc.config" >> .config
-          make oldconfig > oldconfig.log 2>&1 || { echo "make oldconfig failed:"; cat oldconfig.log; exit 1; }
-          if grep -q 'recursive dependency detected' oldconfig.log; then
-            echo "=== Kconfig recursive dependency (oldconfig) ==="
-            grep -E 'recursive dependency|symbol PACKAGE_' oldconfig.log || true
-            exit 1
-          fi
+        run: bash $GITHUB_WORKSPACE/.github/ci/defconfig-turboacc.sh .
 
       - name: Compile
         working-directory: ${{ env.SRC_DIR }}
@@ -227,24 +169,9 @@ jobs:
           merge-multiple: true
 
       - name: Bundle into one release
-        env:
-          DEVICE_INPUT: ${{ github.event.inputs.device || 'all' }}
         run: |
-          set -euo pipefail
-          mkdir -p release
-          shopt -s nullglob
-          files=(artifacts/**/Jas0n0ss-*)
-          [ "${#files[@]}" -gt 0 ] || { echo "ERROR: no firmware files downloaded" >&2; exit 1; }
-          cp -t release/ "${files[@]}"
-          echo "Bundled ${#files[@]} firmware file(s) into one release:"
-          ls -la release/
-          if [ "$DEVICE_INPUT" = "all" ]; then
-            while IFS= read -r dev; do
-              [ -n "$dev" ] || continue
-              ls release/Jas0n0ss-lede-"${dev}"-* >/dev/null 2>&1 \
-                || { echo "ERROR: missing firmware for device: $dev" >&2; exit 1; }
-            done < <(sed 's/#.*//' configs/devices.list | xargs -n1 | grep -v '^$')
-          fi
+          bash .github/ci/release-bundle.sh \
+            lede fw-lede "${{ github.event.inputs.device || 'all' }}"
 
       - name: Create release
         uses: softprops/action-gh-release@v3
