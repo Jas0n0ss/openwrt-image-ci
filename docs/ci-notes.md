@@ -1,12 +1,6 @@
 # CI 说明
 
-## Builder Docker 镜像
-
-- 定义：`docker/Dockerfile`（Ubuntu 22.04 + 编译依赖）
-- 发布：`.github/workflows/docker-builder-image.yml` → `ghcr.io/<owner>/<repo>/builder:22.04`
-- 使用：`build-lede.yml` / `build-immortalwrt.yml` 的 `build` job 通过 `container:` 拉取镜像；`dl` / `feeds` / `ccache` 仍走 Actions cache
-
----
+全量编译 job 在 `ubuntu-22.04` runner 上运行，依赖由 `.github/ci/install-build-deps.sh` 安装；`dl` / `feeds` / `ccache` 仍走 Actions cache。
 
 CI 逻辑在 `.github/workflows/` 与 `.github/ci/`；`scripts/` 仅保留自定义固件内容（feeds/插件/overlay）。
 

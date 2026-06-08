@@ -30,7 +30,6 @@ on:
 
 permissions:
   contents: write
-  packages: read
 
 concurrency:
   group: immortalwrt-${{ github.ref_name }}
@@ -50,13 +49,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.resolve.outputs.matrix }}
-      builder_image: ${{ steps.image.outputs.ref }}
     steps:
       - uses: actions/checkout@v5
-      - id: image
-        run: |
-          source .github/ci/lib/device.sh
-          echo "ref=$(builder_image_ref '${{ github.repository }}')" >> "$GITHUB_OUTPUT"
       - id: resolve
         run: bash .github/ci/resolve-matrix.sh "${{ github.event.inputs.device || 'all' }}"
 
@@ -66,11 +60,6 @@ jobs:
     defaults:
       run:
         shell: bash
-    container:
-      image: ${{ needs.setup.outputs.builder_image }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -93,6 +82,9 @@ jobs:
           set -euo pipefail
           test -f "$GITHUB_WORKSPACE/scripts/setup-custom-packages.sh"
           test -d "$GITHUB_WORKSPACE/configs"
+
+      - name: Install build dependencies
+        run: bash $GITHUB_WORKSPACE/.github/ci/install-build-deps.sh
 
       - name: Cache dl
         uses: actions/cache@v5

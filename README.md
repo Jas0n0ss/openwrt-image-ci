@@ -26,11 +26,10 @@
 
 ## CI 工作流
 
-编译环境使用 GHCR 预构建镜像 `ghcr.io/<owner>/<repo>/builder:22.04`（见 `docker/`）。首次推送 `docker/` 后先跑 **Build builder Docker image**，再跑固件构建。
+全量编译 job 在 `ubuntu-22.04` runner 上通过 `.github/ci/install-build-deps.sh` 安装依赖；`dl` / `feeds` / `ccache` 仍走 Actions cache。
 
 | Workflow | 用途 | 频率 | 耗时 |
 |----------|------|------|------|
-| **Build builder Docker image** | 发布编译环境镜像到 GHCR | 按需 | ~5 分钟 |
 | **Build ipk** | 按架构编译自定义插件 ipk（5 个 job） | 插件变更时 | 数小时 |
 | **Build firmware** | ImageBuilder 日常固件（**推荐**） | 配置/overlay 变更 | ~30–60 分钟 |
 | **Build ImmortalWrt** | 全量源码编译 + ipk | 高级/兜底 | 数小时 |

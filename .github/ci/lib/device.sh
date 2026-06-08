@@ -32,11 +32,6 @@ device_matrix_json() {
   fi
 }
 
-builder_image_ref() {
-  local repo="${1:-${GITHUB_REPOSITORY:-}}"
-  echo "ghcr.io/$(echo "$repo" | tr '[:upper:]' '[:lower:]')/builder:22.04"
-}
-
 canonical_device_for_arch() {
   local arch="$1"
   local list="${2:-profiles/arch-canonical.list}"
