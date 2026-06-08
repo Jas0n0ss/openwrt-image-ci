@@ -61,6 +61,19 @@ patch_dnsmasq() {
   fi
 }
 
+patch_nftables_makefile() {
+  local mk="package/network/utils/nftables/Makefile"
+  [ -f "$mk" ] || return 0
+  if grep -q 'kmod-nft-fullcone' "$mk"; then
+    sed -i 's/[[:space:]]*+kmod-nft-fullcone//' "$mk"
+    echo "==> patched nftables: removed kmod-nft-fullcone from DEPENDS (breaks json/nojson cycle)"
+  fi
+  if grep -q 'BuildPackage,nftables-json' "$mk"; then
+    sed -i 's/^\$(eval $(call BuildPackage,nftables-json))$/# disabled nftables-json (Kconfig cycle with kmod-nft-fullcone)/' "$mk"
+    echo "==> patched nftables: disabled nftables-json variant build"
+  fi
+}
+
 apply_turboacc_overlay() {
   local mk="package/luci-app-turboacc/Makefile"
   local overlay="$OVERLAY/luci-app-turboacc/Makefile"
@@ -75,6 +88,7 @@ remove_pkg_by_name "nftables-json"
 remove_pkg_by_name "nftables-nojson"
 remove_feed_nft_fullcone_dupes
 patch_dnsmasq
+patch_nftables_makefile
 apply_turboacc_overlay
 [ -f package/nft-fullcone/Makefile ] \
   || { echo "ERROR: missing package/nft-fullcone (custom clone required)" >&2; exit 1; }

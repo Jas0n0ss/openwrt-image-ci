@@ -72,7 +72,7 @@ dnsmasq 使用 target 自带的 **DEFAULT_PACKAGES**（`dnsmasq`），不强行�
 
 1. 从 `feeds.conf*` 删除 kenzo/small，并 `rm -rf feeds/{kenzo,small}`
 2. 按 `PKG_NAME:=nftables-json` 删除重复包（修复自引用环）
-3. dnsmasq 去掉 nftset→nftables-json；删除 feeds 里重复的 `kmod-nft-fullcone`（保留 `package/nft-fullcone`）
+3. dnsmasq 去掉 nftset→nftables-json；**nftables** 用户态 Makefile 去掉 `+kmod-nft-fullcone` 并禁用 `nftables-json` 变体（LEDE 上游与自定义 `package/nft-fullcone` 会形成 Kconfig 环）；删除 feeds 里重复的 `kmod-nft-fullcone`（保留 `package/nft-fullcone`）
 4. TurboACC：**clone `luci-app-turboacc` + `nft-fullcone`**；workflow 在 base `make defconfig` 前暂存 TurboACC 包，defconfig 后恢复并启用。
 5. workflow 内联 sanitize — `.config` 守卫项（dnsmasq / nftables / 合并阶段 TurboACC）
 6. `patch_feeds()` **不得**删除 `feeds/luci/luci-ssl`；仅清理 kenzo/small 里的重复 `luci-ssl`
