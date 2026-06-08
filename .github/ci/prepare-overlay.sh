@@ -6,7 +6,8 @@ set -euo pipefail
 SOURCE="${1:?source: lede or immortalwrt}"
 SRC="${2:?src dir}"
 WS="${3:-${GITHUB_WORKSPACE:?}}"
+CI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-bash "$WS/scripts/generate-banner.sh" "$SOURCE" "$WS/files"
-bash "$WS/scripts/bundle-oh-my-bash.sh" "$WS/files"
-bash "$WS/scripts/install-files-overlay.sh" "$SRC" "$WS/files"
+bash "$CI_DIR/generate-banner.sh" "$SOURCE" "$WS/files"
+bash "$CI_DIR/bundle-oh-my-bash.sh" "$WS/files"
+bash "$CI_DIR/install-files-overlay.sh" "$SRC" "$WS/files"

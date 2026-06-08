@@ -2,7 +2,7 @@
 
 全量编译 job 在 `ubuntu-22.04` runner 上运行，依赖由 `.github/ci/install-build-deps.sh` 安装；`dl` / `feeds` / `ccache` 仍走 Actions cache。
 
-CI 逻辑在 `.github/workflows/` 与 `.github/ci/`；`scripts/` 仅保留自定义固件内容（feeds/插件/overlay）。
+CI 逻辑在 `.github/workflows/` 与 `.github/ci/`。用户自定义内容：`configs/`、`files/`、`overlays/`（banner、TurboACC/nft-fullcone Makefile 覆盖）。
 
 ## Feeds（LEDE）
 
@@ -40,7 +40,7 @@ CI 逻辑在 `.github/workflows/` 与 `.github/ci/`；`scripts/` 仅保留自定
 
 已关闭 `INCLUDE_OFFLOADING`（`kmod-fast-classifier` / shortcut-fe 仅部分平台存在）。保留 BBR + nft-fullcone。
 
-**不要**在 `device.config` / `common.config` / `custom-plugins.config` 里启用 TurboACC。`luci-app-turboacc` / `nft-fullcone` 使用 `scripts/overlays/` Makefile（无 `@IPV6`/`PROVIDES`/条件 `LUCI_DEPENDS`）；`kmod-tcp-bbr` / `kmod-nft-fullcone` 仅在 `configs/snippets/turboacc.config` 里启用。`defconfig-turboacc.sh` 在 base `make defconfig` 前**暂存** TurboACC 包，defconfig 后恢复并 `oldconfig`；每次 defconfig/oldconfig 前运行 `patch-kconfig-tree.sh` 删除 feed 重复 `nft-fullcone`/`nftables-json`。
+**不要**在 `device.config` / `common.config` / `custom-plugins.config` 里启用 TurboACC。`luci-app-turboacc` / `nft-fullcone` 使用 `overlays/` Makefile（无 `@IPV6`/`PROVIDES`/条件 `LUCI_DEPENDS`）；`kmod-tcp-bbr` / `kmod-nft-fullcone` 仅在 `configs/snippets/turboacc.config` 里启用。`defconfig-turboacc.sh` 在 base `make defconfig` 前**暂存** TurboACC 包，defconfig 后恢复并 `oldconfig`；每次 defconfig/oldconfig 前运行 `patch-kconfig-tree.sh` 删除 feed 重复 `nft-fullcone`/`nftables-json`。
 
 ## 生成 .config（workflow 内联）
 
@@ -66,7 +66,7 @@ dnsmasq 使用 target 自带的 **DEFAULT_PACKAGES**（`dnsmasq`），不强行�
 
 1. 从 `feeds.conf*` 删除 kenzo/small，并 `rm -rf feeds/{kenzo,small}`
 2. 按 `PKG_NAME:=nftables-json` 删除重复包（修复自引用环）
-3. dnsmasq 去掉 nftset→nftables-json；**nftables** 用户态 Makefile 去掉 `+kmod-nft-fullcone` 并禁用 `nftables-json` 变体（LEDE 上游与自定义 `package/nft-fullcone` 会形成 Kconfig 环）；删除 feeds 里重复的 `kmod-nft-fullcone`（保留 `package/nft-fullcone`）
+3. dnsmasq 去掉 nftset→nftables-json；**nftables** 用户态 Makefile（LEDE）去掉 `+kmod-nft-fullcone`；删除 feeds 里重复的 `nft-fullcone`/`nftables-json` 目录（保留主树 json 变体）；`firewall4` 依赖 `nftables-json` 不可禁用
 4. TurboACC：**clone `luci-app-turboacc` + `nft-fullcone`**；workflow 在 base `make defconfig` 前暂存 TurboACC 包，defconfig 后恢复并启用。
 5. workflow 内联 sanitize — `.config` 守卫项（dnsmasq / nftables / 合并阶段 TurboACC）
 6. `patch_feeds()` **不得**删除 `feeds/luci/luci-ssl`；仅清理 kenzo/small 里的重复 `luci-ssl`
@@ -97,7 +97,7 @@ workflow 内联 defconfig 校验：日志里出现任意 `recursive dependency d
 ## setup 校验
 
 `verify_setup()`：PassWall + xray/sing-box 版本 + `luci-ssl` + MosDNS / TurboACC / Aurora / arpbind / `nft-fullcone`
-- workflow setup 校验：禁止在 device/common/custom 中提前写 TurboACC / dnsmasq-full / nftables-json
+- workflow setup 校验：禁止在 device/common/custom 中提前写 TurboACC / dnsmasq-full
 - 克隆失败立即 `exit 1`（不再静默继续）
 
 ## matrix / GITHUB_OUTPUT

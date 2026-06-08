@@ -27,14 +27,10 @@ echo "CONFIG_CCACHE=y" >> .config
 sed -i \
   -e '/^CONFIG_PACKAGE_dnsmasq-full=y$/d' \
   -e '/^CONFIG_PACKAGE_dnsmasq_full_/d' \
-  -e '/^CONFIG_PACKAGE_nftables-json=y$/d' \
-  -e '/^CONFIG_PACKAGE_nftables-nojson=y$/d' \
   -e '/^CONFIG_PACKAGE_luci-app-turboacc/d' \
   -e '/^CONFIG_PACKAGE_kmod-nft-fullcone=y$/d' \
   -e '/^CONFIG_PACKAGE_kmod-tcp-bbr=y$/d' \
   .config
 {
   echo "# CONFIG_PACKAGE_dnsmasq-full is not set"
-  echo "# CONFIG_PACKAGE_nftables-json is not set"
-  echo "# CONFIG_PACKAGE_nftables-nojson is not set"
 } >> .config

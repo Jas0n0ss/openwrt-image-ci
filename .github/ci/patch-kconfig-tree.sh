@@ -7,7 +7,10 @@ set -euo pipefail
 SRC="${1:-.}"
 cd "$SRC"
 
-OVERLAY="${PATCH_OVERLAY:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/overlays}"
+CI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/repo.sh
+source "$CI_DIR/lib/repo.sh"
+OVERLAY="$(ci_overlay_root)"
 
 # Custom clones under package/ — never delete when scrubbing feed duplicates.
 is_protected_pkg_dir() {
@@ -75,10 +78,6 @@ patch_nftables_makefile() {
     sed -i 's/[[:space:]]*+kmod-nft-fullcone//' "$mk"
     echo "==> patched nftables: removed kmod-nft-fullcone from DEPENDS (breaks json/nojson cycle)"
   fi
-  if grep -q 'BuildPackage,nftables-json' "$mk"; then
-    sed -i 's/^\$(eval $(call BuildPackage,nftables-json))$/# disabled nftables-json (Kconfig cycle with kmod-nft-fullcone)/' "$mk"
-    echo "==> patched nftables: disabled nftables-json variant build"
-  fi
 }
 
 apply_turboacc_overlay() {
@@ -101,7 +100,6 @@ apply_nft_fullcone_overlay() {
 
 echo "==> patch-kconfig-tree in $(pwd)"
 remove_pkg_by_name "nftables-json"
-remove_pkg_by_name "nftables-nojson"
 remove_nft_fullcone_dupes
 patch_dnsmasq
 patch_nftables_makefile

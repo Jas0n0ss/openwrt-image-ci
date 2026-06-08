@@ -8,7 +8,7 @@ WS="${2:-${GITHUB_WORKSPACE:?}}"
 
 cd "$SRC"
 PATCH="$WS/.github/ci/patch-kconfig-tree.sh"
-export PATCH_OVERLAY="$WS/scripts/overlays"
+export PATCH_OVERLAY="$WS/overlays"
 STASH="$WS/.turboacc-stash"
 
 stash_turboacc() {

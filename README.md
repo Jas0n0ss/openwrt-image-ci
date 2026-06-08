@@ -48,7 +48,15 @@ Actions → 选 workflow → Run workflow → device 选 all 或单台设备
 
 **仅手动触发**（push / 定时已关闭）。选择 **all** 时，所有设备固件合并到**同一个 Release**（`firmware-<编号>` / `immortalwrt-<编号>` / `lede-<编号>`）。
 
-共享 CI 脚本位于 `.github/ci/`（`merge-config.sh`、`defconfig-turboacc.sh`、`fetch-ipk-cache.sh` 等），全量编译与 ipk 流水线共用同一套 Kconfig 修复逻辑。
+## 目录
+
+| 路径 | 说明 |
+|------|------|
+| `.github/ci/` | CI 脚本（feeds 安装、Kconfig 修复、打包、ImageBuilder 等） |
+| `configs/` | 分层 `.config`（设备 / common / 插件 / snippets） |
+| `files/` | 固件 rootfs 覆盖（uci-defaults、自定义配置等） |
+| `overlays/` | 用户自定义 Makefile 覆盖与 banner 模板 |
+| `profiles/` | 架构与设备映射（ipk 流水线） |
 
 ## 默认凭据
 

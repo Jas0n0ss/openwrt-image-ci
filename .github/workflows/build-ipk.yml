@@ -57,7 +57,7 @@ jobs:
       - name: Verify CI workspace
         run: |
           set -euo pipefail
-          test -f "$GITHUB_WORKSPACE/scripts/setup-custom-packages.sh"
+          test -f "$GITHUB_WORKSPACE/.github/ci/setup-custom-packages.sh"
           test -d "$GITHUB_WORKSPACE/configs"
 
       - name: Install build dependencies
@@ -67,7 +67,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/dl
-          key: dl-ipk-${{ matrix.arch }}-${{ hashFiles('configs/**', 'scripts/setup-custom-packages.sh') }}
+          key: dl-ipk-${{ matrix.arch }}-${{ hashFiles('configs/**', '.github/ci/setup-custom-packages.sh') }}
           restore-keys: |
             dl-ipk-${{ matrix.arch }}-
             dl-immortalwrt-
@@ -76,8 +76,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-ipk-v2-${{ hashFiles('configs/**', 'scripts/**', '.github/ci/**') }}
-          restore-keys: feeds-ipk-v2-
+          key: feeds-ipk-v3-${{ hashFiles('configs/**', 'overlays/**', '.github/ci/**') }}
+          restore-keys: feeds-ipk-v3-
 
       - name: Cache ccache
         uses: actions/cache@v5
@@ -88,7 +88,7 @@ jobs:
 
       - name: Setup feeds and packages
         working-directory: ${{ env.SRC_DIR }}
-        run: bash $GITHUB_WORKSPACE/scripts/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
+        run: bash $GITHUB_WORKSPACE/.github/ci/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
 
       - name: Prepare overlay
         run: bash $GITHUB_WORKSPACE/.github/ci/prepare-overlay.sh immortalwrt "${{ env.SRC_DIR }}"

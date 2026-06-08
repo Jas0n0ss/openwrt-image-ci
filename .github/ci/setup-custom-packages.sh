@@ -5,8 +5,12 @@
 set -euo pipefail
 
 SRC_DIR="${1:?source directory required}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_ROOT="${3:-${SCRIPT_DIR}/../configs}"
+CI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/repo.sh
+source "$CI_DIR/lib/repo.sh"
+REPO_ROOT="$(ci_repo_root)"
+OVERLAY_ROOT="$(ci_overlay_root)"
+CONFIG_ROOT="${3:-$REPO_ROOT/configs}"
 
 cd "$SRC_DIR"
 
@@ -93,7 +97,7 @@ patch_dnsmasq_makefile() {
 }
 
 apply_turboacc_overlay() {
-  local overlay="$SCRIPT_DIR/overlays/luci-app-turboacc/Makefile"
+  local overlay="$OVERLAY_ROOT/luci-app-turboacc/Makefile"
   [ -d package/luci-app-turboacc ] || return 0
   [ -f "$overlay" ] || { echo "ERROR: missing $overlay" >&2; exit 1; }
   cp -f "$overlay" package/luci-app-turboacc/Makefile
@@ -101,7 +105,7 @@ apply_turboacc_overlay() {
 }
 
 apply_nft_fullcone_overlay() {
-  local overlay="$SCRIPT_DIR/overlays/nft-fullcone/Makefile"
+  local overlay="$OVERLAY_ROOT/nft-fullcone/Makefile"
   [ -d package/nft-fullcone ] || return 0
   [ -f "$overlay" ] || { echo "ERROR: missing $overlay" >&2; exit 1; }
   cp -f "$overlay" package/nft-fullcone/Makefile
@@ -139,7 +143,7 @@ patch_feeds() {
     fi
   done
 
-  for name in luci-app-unblockneteasemusic nftables-json nftables-nojson nft-fullcone; do
+  for name in luci-app-unblockneteasemusic nftables-json nft-fullcone; do
     remove_tree_named "$name"
   done
   patch_dnsmasq_makefile
@@ -310,8 +314,7 @@ for cfg in "${CONFIG_FILES[@]}"; do
   done < <(extract_kconfig_packages "$cfg")
 done
 
-PATCH_SCRIPT="$(cd "$SCRIPT_DIR/.." && pwd)/.github/ci/patch-kconfig-tree.sh"
-PATCH_OVERLAY="$SCRIPT_DIR/overlays" bash "$PATCH_SCRIPT" .
+PATCH_OVERLAY="$OVERLAY_ROOT" bash "$CI_DIR/patch-kconfig-tree.sh" .
 
 verify_setup
 echo "==> Custom package setup finished"

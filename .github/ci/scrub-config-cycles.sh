@@ -10,13 +10,9 @@ CFG="${1:-.config}"
 sed -i \
   -e '/^CONFIG_PACKAGE_dnsmasq-full=y$/d' \
   -e '/^CONFIG_PACKAGE_dnsmasq_full_/d' \
-  -e '/^CONFIG_PACKAGE_nftables-json=y$/d' \
-  -e '/^CONFIG_PACKAGE_nftables-nojson=y$/d' \
   "$CFG"
 
 {
   echo "# CONFIG_PACKAGE_dnsmasq-full is not set"
   echo "# CONFIG_PACKAGE_dnsmasq_full_nftset is not set"
-  echo "# CONFIG_PACKAGE_nftables-json is not set"
-  echo "# CONFIG_PACKAGE_nftables-nojson is not set"
 } >> "$CFG"

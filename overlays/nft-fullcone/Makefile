@@ -10,7 +10,7 @@ include $(INCLUDE_DIR)/package.mk
 
 define KernelPackage/nft-fullcone
   SUBMENU:=Netfilter Extensions
-  DEPENDS:=+kmod-nft-core +kmod-nf-conntrack +IPV6:kmod-nf-conntrack6
+  DEPENDS:=+kmod-nft-core +kmod-nf-conntrack
   TITLE:=nftables fullcone expression support
   FILES:= $(PKG_BUILD_DIR)/nft_fullcone.ko
   KCONFIG:= CONFIG_NFT_FULLCONE=y CONFIG_NF_NAT=y CONFIG_NF_NAT_IPV6=y CONFIG_NF_CONNTRACK_EVENTS=y CONFIG_NF_CONNTRACK_CHAIN_EVENTS=y

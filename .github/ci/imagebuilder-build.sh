@@ -72,8 +72,8 @@ cp -a "$IPK_SRC"/*.ipk "$IB_DIR/packages/"
 
 FILES_DIR="$WORKDIR/overlay"
 mkdir -p "$FILES_DIR"
-bash "$WORKSPACE/scripts/generate-banner.sh" immortalwrt "$WORKSPACE/files"
-bash "$WORKSPACE/scripts/bundle-oh-my-bash.sh" "$WORKSPACE/files"
+bash "$CI_DIR/generate-banner.sh" immortalwrt "$WORKSPACE/files"
+bash "$CI_DIR/bundle-oh-my-bash.sh" "$WORKSPACE/files"
 cp -a "$WORKSPACE/files/." "$FILES_DIR/"
 
 PACKAGES="$(extract_packages)"
