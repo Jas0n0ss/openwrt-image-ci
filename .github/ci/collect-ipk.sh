@@ -49,7 +49,7 @@ for pattern in luci-app-passwall passwall hysteria mosdns v2dat turboacc nft-ful
 done
 
 [ "$found" -eq 1 ] || { echo "ERROR: no custom ipk in $arch_dir" >&2; exit 1; }
-echo "Collected ipk for $ARCH: $(find "$out" -name '*.ipk' | wc -l) files"
+echo "Collected ipk for $ARCH: $(find "$out" -name '*.ipk' | wc -l) files" >&2
 if [ -n "${GITHUB_ENV:-}" ]; then
   echo "arch=$ARCH" >> "$GITHUB_ENV"
 fi

@@ -6,7 +6,7 @@ arch_from_config() {
   if grep -q '^CONFIG_TARGET_x86_64=y' "$cfg"; then echo x86_64
   elif grep -q '^CONFIG_TARGET_qualcommax_ipq807x=y' "$cfg"; then echo aarch64_cortex-a53
   elif grep -q '^CONFIG_TARGET_mediatek_filogic=y' "$cfg"; then echo aarch64_cortex-a53
-  elif grep -q '^CONFIG_TARGET_ramips_mt7621=y' "$cfg"; then echo mips_24kc
+  elif grep -q '^CONFIG_TARGET_ramips_mt7621=y' "$cfg"; then echo mipsel_24kc
   elif grep -q '^CONFIG_TARGET_rockchip_armv8=y' "$cfg"; then echo aarch64_generic
   elif grep -q '^CONFIG_TARGET_bcm27xx_bcm2711=y' "$cfg"; then echo aarch64_cortex-a72
   else echo "ERROR: unknown target in $cfg" >&2; return 1; fi

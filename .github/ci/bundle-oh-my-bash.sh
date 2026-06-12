@@ -9,7 +9,7 @@ OMB_DIR="$FILES_ROOT/etc/oh-my-bash"
 OMB_REPO="${OMB_REPO:-https://github.com/ohmybash/oh-my-bash.git}"
 OMB_BRANCH="${OMB_BRANCH:-master}"
 
-if [ -d "$OMB_DIR/oh-my-bash.sh" ]; then
+if [ -f "$OMB_DIR/oh-my-bash.sh" ]; then
   echo "oh-my-bash already bundled at $OMB_DIR"
   exit 0
 fi

@@ -1,0 +1,15 @@
+---
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-uptime-du
+    restart: unless-stopped
+    command: >
+      tunnel --no-autoupdate run
+      --token eyJhIjoiZjkxYTYxZWE2NTNmYmZmMGNlYzRjNmY3ZTA0YjEzMTQiLCJ0IjoiODlmMGU2MmQtNjUyMC00MjcxLTg2MTctMmE2YzhiMTMwZTU5IiwicyI6IlpUVmlNMlZpT1RZdE56Wm1ZUzAwWWpRd0xUZ3lZMlF0TldJeU5XRm1PR1V4WVRVeiJ9
+    network_mode: host
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

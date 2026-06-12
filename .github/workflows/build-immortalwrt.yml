@@ -107,6 +107,12 @@ jobs:
           key: ccache-immortalwrt-${{ matrix.device }}-${{ hashFiles('configs/immortalwrt/common.config', 'configs/custom-plugins.config') }}
           restore-keys: ccache-immortalwrt-${{ matrix.device }}-
 
+      - name: Cache oh-my-bash
+        uses: actions/cache@v5
+        with:
+          path: files/etc/oh-my-bash
+          key: omb-${{ hashFiles('.github/ci/bundle-oh-my-bash.sh') }}
+
       - name: Setup feeds and packages
         working-directory: ${{ env.SRC_DIR }}
         run: bash $GITHUB_WORKSPACE/.github/ci/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
@@ -129,7 +135,7 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="/usr/lib/ccache:$PATH"
-          make download -j8
+          make download -j"$(nproc)"
           make toolchain/compile -j"$(nproc)" || make toolchain/compile -j1 V=s
           make -j"$(nproc)" || make -j1 V=s
 
@@ -150,7 +156,7 @@ jobs:
           echo "arch=$arch" >> "$GITHUB_OUTPUT"
 
       - name: Save custom ipk cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ipk-staging/${{ steps.ipk.outputs.arch }}
           key: ipk-${{ steps.ipk.outputs.arch }}-${{ github.run_id }}

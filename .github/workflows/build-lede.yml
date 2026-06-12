@@ -105,6 +105,12 @@ jobs:
           key: ccache-lede-${{ matrix.device }}-${{ hashFiles('configs/lede/common.config', 'configs/custom-plugins.config') }}
           restore-keys: ccache-lede-${{ matrix.device }}-
 
+      - name: Cache oh-my-bash
+        uses: actions/cache@v5
+        with:
+          path: files/etc/oh-my-bash
+          key: omb-${{ hashFiles('.github/ci/bundle-oh-my-bash.sh') }}
+
       - name: Setup feeds and packages
         working-directory: ${{ env.SRC_DIR }}
         run: bash $GITHUB_WORKSPACE/.github/ci/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
@@ -127,7 +133,8 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="/usr/lib/ccache:$PATH"
-          make download -j8
+          make download -j"$(nproc)"
+          make toolchain/compile -j"$(nproc)" || make toolchain/compile -j1 V=s
           make -j"$(nproc)" || make -j1 V=s
 
       - name: Pack firmware
