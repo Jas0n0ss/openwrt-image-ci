@@ -1,4 +1,6 @@
-# 按架构编译自定义 ipk（5 个 job），供 Build firmware 使用
+# 按架构编译自定义 ipk（轻量备用）
+# 全量编译（Build LEDE / Build ImmortalWrt）现已内置 ipk 收集，此 workflow 可作为
+# 仅需刷新 ipk 缓存而无需重新编译完整固件时的快捷入口。
 
 name: Build ipk
 

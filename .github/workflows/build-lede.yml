@@ -145,6 +145,28 @@ jobs:
             "$GITHUB_WORKSPACE/configs/lede/${{ matrix.device }}.config" \
             bin/targets "../release/${{ matrix.device }}"
 
+      - name: Collect custom ipk
+        id: ipk
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          arch="$(bash $GITHUB_WORKSPACE/.github/ci/collect-ipk.sh \
+            . "$GITHUB_WORKSPACE/configs" "../ipk-staging" lede)"
+          echo "arch=$arch" >> "$GITHUB_OUTPUT"
+
+      - name: Save custom ipk cache
+        uses: actions/cache/save@v5
+        with:
+          path: ipk-staging/${{ steps.ipk.outputs.arch }}
+          key: ipk-lede-${{ steps.ipk.outputs.arch }}-${{ github.run_id }}
+
+      - name: Upload ipk artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: lede-ipk-${{ steps.ipk.outputs.arch }}
+          path: ipk-staging/${{ steps.ipk.outputs.arch }}
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v5
         with:

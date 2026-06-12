@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Collect custom plugin ipk from a full ImmortalWrt compile tree.
-# Usage: collect-ipk.sh <src_dir> <config_root> <staging_dir>
-# Writes collected arch name to $GITHUB_ENV as arch= when set.
+# Collect custom plugin ipk from a full OpenWrt/LEDE/ImmortalWrt compile tree.
+# Usage: collect-ipk.sh <src_dir> <config_root> <staging_dir> [lede|immortalwrt]
+# Fourth arg selects which repo's common.config to read (default: immortalwrt).
+# Writes collected arch name to stdout (one line); info goes to stderr.
 
 set -euo pipefail
 SRC="${1:?}"
 ROOT="${2:?}"
 DEST="${3:?}"
+REPO="${4:-immortalwrt}"
 
 cd "$SRC"
 PKG_ROOT="bin/packages"
@@ -38,7 +40,7 @@ while IFS= read -r pkg; do
   shopt -s nullglob
   for ipk in "$arch_dir"/${pkg}*.ipk; do cp -a "$ipk" "$out/"; found=1; done
   shopt -u nullglob
-done < <(extract_pkgs "$ROOT/immortalwrt/common.config" "$ROOT/custom-plugins.config" \
+done < <(extract_pkgs "$ROOT/$REPO/common.config" "$ROOT/custom-plugins.config" \
   "$ROOT/snippets/turboacc.config" | sort -u)
 
 for pattern in luci-app-passwall passwall hysteria mosdns v2dat turboacc nft-fullcone \
