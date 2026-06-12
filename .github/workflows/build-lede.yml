@@ -43,8 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
+      builder_image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v5
+      - id: meta
+        run: |
+          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${owner}/openwrt-builder:latest" >> "$GITHUB_OUTPUT"
       - id: matrix
         run: |
           set -euo pipefail
@@ -68,7 +73,7 @@ jobs:
     needs: setup
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/${{ github.repository_owner }}/openwrt-builder:latest
+      image: ${{ needs.setup.outputs.builder_image }}
       options: --user root
     defaults:
       run:
