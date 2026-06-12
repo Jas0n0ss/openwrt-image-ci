@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# patch-kconfig-tree + defconfig + scrub + TurboACC oldconfig.
+# patch-kconfig-tree + defconfig + cycle-scrub + TurboACC oldconfig.
 # Usage: defconfig-turboacc.sh <src_dir> [workspace]
 
 set -euo pipefail
@@ -7,7 +7,7 @@ SRC="${1:?}"
 WS="${2:-${GITHUB_WORKSPACE:?}}"
 
 cd "$SRC"
-PATCH="$WS/.github/ci/patch-kconfig-tree.sh"
+PATCH="$WS/.github/scripts/patch-kconfig-tree.sh"
 export PATCH_OVERLAY="$WS/overlays"
 STASH="$WS/.turboacc-stash"
 
@@ -45,7 +45,15 @@ if grep -q 'recursive dependency detected' defconfig.log; then
   exit 1
 fi
 
-bash "$WS/.github/ci/scrub-config-cycles.sh" .config
+# Scrub Kconfig cycle-prone symbols from .config
+sed -i \
+  -e '/^CONFIG_PACKAGE_dnsmasq-full=y$/d' \
+  -e '/^CONFIG_PACKAGE_dnsmasq_full_/d' \
+  .config
+{
+  echo "# CONFIG_PACKAGE_dnsmasq-full is not set"
+  echo "# CONFIG_PACKAGE_dnsmasq_full_nftset is not set"
+} >> .config
 
 restore_turboacc
 bash "$PATCH" .

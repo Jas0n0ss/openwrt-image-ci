@@ -1,7 +1,0 @@
-# OpenWrt package arch : canonical ImmortalWrt device for ipk-only builds
-# Format: <arch><space><device>
-aarch64_cortex-a53 xiaomi-wr30u
-mipsel_24kc phicomm-k2p
-aarch64_generic r2s
-aarch64_cortex-a72 raspberrypi-4b
-x86_64 x86_64

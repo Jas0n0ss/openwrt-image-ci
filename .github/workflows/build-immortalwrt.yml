@@ -1,4 +1,4 @@
-# 全量编译 ImmortalWrt（高级，数小时）— 日常请用 Build firmware + Build ipk
+# 全量编译 ImmortalWrt — 手动触发，可选设备
 
 name: Build ImmortalWrt
 
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: "all"
+        description: "设备（all = 全部编译）"
         type: choice
         required: true
         default: all
@@ -22,11 +22,6 @@ on:
           - r2s
           - x86_64
           - raspberrypi-4b
-  # 已关闭自动构建：优化配置后在 Actions 手动 Run workflow
-  # push:
-  #   branches: [main]
-  # schedule:
-  #   - cron: "0 20 * * 0"
 
 permissions:
   contents: write
@@ -37,7 +32,6 @@ concurrency:
 
 env:
   TZ: Asia/Shanghai
-  REPO: immortalwrt
   UPSTREAM: immortalwrt/immortalwrt
   SRC_DIR: src
   CCACHE_DIR: ~/.ccache
@@ -48,15 +42,34 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.resolve.outputs.matrix }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
-      - id: resolve
-        run: bash .github/ci/resolve-matrix.sh "${{ github.event.inputs.device || 'all' }}"
+      - id: matrix
+        run: |
+          set -euo pipefail
+          source .github/scripts/lib/device.sh
+          PICK="${{ github.event.inputs.device || 'all' }}"
+          mapfile -t ALL < <(list_devices configs/devices.list)
+          if [ "$PICK" = "all" ] || [ -z "$PICK" ]; then
+            json=$(printf '"%s",' "${ALL[@]}" | sed 's/,$//')
+            echo "matrix={\"device\":[${json}]}" >> "$GITHUB_OUTPUT"
+          else
+            for d in "${ALL[@]}"; do
+              [ "$d" = "$PICK" ] && {
+                echo "matrix={\"device\":[\"${PICK}\"]}" >> "$GITHUB_OUTPUT"
+                exit 0
+              }
+            done
+            echo "ERROR: unknown device '$PICK'" >&2; exit 1
+          fi
 
   build:
     needs: setup
     runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/openwrt-builder:latest
+      options: --user root
     defaults:
       run:
         shell: bash
@@ -77,27 +90,18 @@ jobs:
           path: ${{ env.SRC_DIR }}
           fetch-depth: 1
 
-      - name: Verify CI workspace
-        run: |
-          set -euo pipefail
-          test -f "$GITHUB_WORKSPACE/.github/ci/setup-custom-packages.sh"
-          test -d "$GITHUB_WORKSPACE/configs"
-
-      - name: Install build dependencies
-        run: bash $GITHUB_WORKSPACE/.github/ci/install-build-deps.sh
-
       - name: Cache dl
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/dl
-          key: dl-immortalwrt-${{ hashFiles('configs/**', '.github/ci/setup-custom-packages.sh') }}
+          key: dl-immortalwrt-${{ hashFiles('configs/**', '.github/scripts/setup-custom-packages.sh') }}
           restore-keys: dl-immortalwrt-
 
       - name: Cache feeds
         uses: actions/cache@v5
         with:
           path: ${{ env.SRC_DIR }}/feeds
-          key: feeds-immortalwrt-v7-${{ hashFiles('configs/**', 'overlays/**', '.github/ci/**') }}
+          key: feeds-immortalwrt-v7-${{ hashFiles('configs/**', 'overlays/**', '.github/scripts/**') }}
           restore-keys: feeds-immortalwrt-v7-
 
       - name: Cache ccache
@@ -111,63 +115,114 @@ jobs:
         uses: actions/cache@v5
         with:
           path: files/etc/oh-my-bash
-          key: omb-${{ hashFiles('.github/ci/bundle-oh-my-bash.sh') }}
+          key: omb-v1
 
       - name: Setup feeds and packages
         working-directory: ${{ env.SRC_DIR }}
-        run: bash $GITHUB_WORKSPACE/.github/ci/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
+        run: bash $GITHUB_WORKSPACE/.github/scripts/setup-custom-packages.sh . append $GITHUB_WORKSPACE/configs
 
       - name: Prepare overlay
-        run: bash $GITHUB_WORKSPACE/.github/ci/prepare-overlay.sh immortalwrt "${{ env.SRC_DIR }}"
+        run: |
+          set -euo pipefail
+          # Banner
+          cp overlays/banners/immortalwrt.banner files/etc/banner
+          echo "immortalwrt" > files/etc/jas0n0ss-build-source
+          # oh-my-bash (skip on cache hit)
+          OMB_DIR="files/etc/oh-my-bash"
+          if [ ! -f "$OMB_DIR/oh-my-bash.sh" ]; then
+            rm -rf "$OMB_DIR"
+            git clone --depth 1 --branch master \
+              https://github.com/ohmybash/oh-my-bash.git "$OMB_DIR"
+            rm -rf "$OMB_DIR/.git"
+          fi
+          # Copy files/ overlay into src
+          mkdir -p "${{ env.SRC_DIR }}/files"
+          cp -a files/. "${{ env.SRC_DIR }}/files/"
+          chmod +x "${{ env.SRC_DIR }}/files/etc/uci-defaults/"* 2>/dev/null || true
 
       - name: Generate .config
         working-directory: ${{ env.SRC_DIR }}
         run: |
-          bash $GITHUB_WORKSPACE/.github/ci/merge-config.sh \
-            immortalwrt "${{ matrix.device }}" .
+          set -euo pipefail
+          cat "$GITHUB_WORKSPACE/configs/immortalwrt/${{ matrix.device }}.config" > .config
+          cat "$GITHUB_WORKSPACE/configs/immortalwrt/common.config" >> .config
+          cat "$GITHUB_WORKSPACE/configs/custom-plugins.config" >> .config
+          for snip in wireless-core luci-zh-cn no-rust-passwall no-selinux; do
+            f="$GITHUB_WORKSPACE/configs/snippets/$snip.config"
+            [ -f "$f" ] && cat "$f" >> .config
+          done
+          printf 'CONFIG_DEVEL=y\nCONFIG_CCACHE=y\n' >> .config
+          sed -i \
+            -e '/^CONFIG_PACKAGE_dnsmasq-full=y$/d' \
+            -e '/^CONFIG_PACKAGE_dnsmasq_full_/d' \
+            -e '/^CONFIG_PACKAGE_luci-app-turboacc/d' \
+            -e '/^CONFIG_PACKAGE_kmod-nft-fullcone=y$/d' \
+            -e '/^CONFIG_PACKAGE_kmod-tcp-bbr=y$/d' \
+            .config
+          echo "# CONFIG_PACKAGE_dnsmasq-full is not set" >> .config
 
       - name: Defconfig and TurboACC
         working-directory: ${{ env.SRC_DIR }}
-        run: bash $GITHUB_WORKSPACE/.github/ci/defconfig-turboacc.sh .
+        run: bash $GITHUB_WORKSPACE/.github/scripts/defconfig-turboacc.sh .
 
       - name: Compile
         working-directory: ${{ env.SRC_DIR }}
         run: |
           set -euo pipefail
-          export PATH="/usr/lib/ccache:$PATH"
           make download -j"$(nproc)"
           make toolchain/compile -j"$(nproc)" || make toolchain/compile -j1 V=s
           make -j"$(nproc)" || make -j1 V=s
-
-      - name: Pack firmware
-        working-directory: ${{ env.SRC_DIR }}
-        run: |
-          bash $GITHUB_WORKSPACE/.github/ci/pack-firmware.sh \
-            "${{ matrix.device }}" immortalwrt \
-            "$GITHUB_WORKSPACE/configs/immortalwrt/${{ matrix.device }}.config" \
-            bin/targets "../release/${{ matrix.device }}"
 
       - name: Collect custom ipk
         id: ipk
         working-directory: ${{ env.SRC_DIR }}
         run: |
-          arch="$(bash $GITHUB_WORKSPACE/.github/ci/collect-ipk.sh \
-            . "$GITHUB_WORKSPACE/configs" "../ipk-staging")"
-          echo "arch=$arch" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          PKG_ROOT="bin/packages"
+          if [ ! -d "$PKG_ROOT" ]; then
+            echo "No bin/packages found, skipping ipk collection" >&2
+            echo "arch=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mapfile -t arches < <(find "$PKG_ROOT" -mindepth 1 -maxdepth 1 -type d \
+            -exec basename {} \; | sort -u)
+          ARCH="${arches[0]:-none}"
+          [ "$ARCH" = "none" ] && { echo "arch=none" >> "$GITHUB_OUTPUT"; exit 0; }
+          arch_dir="$PKG_ROOT/$ARCH/packages"
+          out="../ipk-staging/$ARCH"
+          mkdir -p "$out"
+          shopt -s nullglob
+          for pat in luci-app-passwall passwall hysteria mosdns v2dat \
+            turboacc nft-fullcone luci-theme-aurora luci-app-arpbind \
+            xray-core sing-box; do
+            for ipk in "$arch_dir"/${pat}*.ipk; do cp -a "$ipk" "$out/"; done
+          done
+          shopt -u nullglob
+          echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
 
       - name: Save custom ipk cache
+        if: steps.ipk.outputs.arch != 'none'
         uses: actions/cache/save@v5
         with:
           path: ipk-staging/${{ steps.ipk.outputs.arch }}
           key: ipk-${{ steps.ipk.outputs.arch }}-${{ github.run_id }}
 
       - name: Upload ipk artifact
+        if: steps.ipk.outputs.arch != 'none'
         uses: actions/upload-artifact@v5
         with:
           name: immortalwrt-ipk-${{ steps.ipk.outputs.arch }}
           path: ipk-staging/${{ steps.ipk.outputs.arch }}
           retention-days: 30
-          if-no-files-found: error
+          if-no-files-found: warn
+
+      - name: Pack firmware
+        working-directory: ${{ env.SRC_DIR }}
+        run: |
+          bash $GITHUB_WORKSPACE/.github/scripts/pack-firmware.sh \
+            "${{ matrix.device }}" immortalwrt \
+            "$GITHUB_WORKSPACE/configs/immortalwrt/${{ matrix.device }}.config" \
+            bin/targets "../release/${{ matrix.device }}"
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v5
@@ -191,12 +246,17 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Bundle into one release
-        run: |
-          bash .github/ci/release-bundle.sh \
-            immortalwrt fw-immortalwrt "${{ github.event.inputs.device || 'all' }}"
-
       - name: Create release
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          shopt -s globstar nullglob
+          files=(artifacts/**/Jas0n0ss-*)
+          [ "${#files[@]}" -gt 0 ] || { echo "ERROR: no firmware files" >&2; exit 1; }
+          cp -t release/ "${files[@]}"
+          echo "Bundled ${#files[@]} firmware file(s)"
+
+      - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: immortalwrt-${{ github.run_number }}
